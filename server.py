@@ -218,7 +218,9 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"authenticated": False})
                 return
             files = {"/": ("index.html", "text/html"), "/app.js": ("app.js", "text/javascript"),
-                     "/style.css": ("style.css", "text/css")}
+                     "/style.css": ("style.css", "text/css"),
+                     "/login.css": ("login.css", "text/css"),
+                     "/login-scene.js": ("login-scene.js", "text/javascript")}
             if path not in files:
                 raise GameError("页面不存在。", 404)
             name, content_type = files[path]

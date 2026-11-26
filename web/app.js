@@ -54,6 +54,7 @@ class AppleTown {
   }
 
   screen(id) {
+    document.body.classList.toggle("login-view", id === "entry");
     for (const screen of ["entry", "mode-screen", "game-screen"]) $(screen).hidden = screen !== id;
     $("logout").hidden = !this.state;
   }

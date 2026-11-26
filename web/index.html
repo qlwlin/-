@@ -6,9 +6,11 @@
   <meta name="theme-color" content="#243e39">
   <title>苹果镇的平安夜 · 钟楼的歌</title>
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/login.css">
+  <script src="/login-scene.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
-<body>
+<body class="login-view">
   <header class="header">
     <a href="/" class="brand"><span class="brand-icon">✦</span><span>苹果镇的平安夜<small>THE CHRISTMAS EVE OF APPLE TOWN</small></span></a>
     <span class="edition">第一封冬日来信 <i>·</i> 钟楼的歌</span>
@@ -16,23 +18,20 @@
   </header>
   <main>
     <section id="entry" class="entry">
+        <div class="login-diorama">
+          <div class="diorama-heading"><span class="scene-live-dot"></span> 苹果镇 · 平安夜 <span class="diorama-weather">−2° / 轻雪</span></div>
+          <canvas id="login-scene" role="img" aria-label="等距视角的苹果镇：积雪钟楼、暖光房屋、圣诞树与红袍圣诞老人">雪夜中的苹果镇钟楼与小镇。</canvas>
+          <div class="diorama-bottom"><div><span class="diorama-chapter">01 / THE SONG OF THE CLOCK TOWER</span><span class="diorama-title">钟楼的歌</span></div><button id="login-snow" type="button" aria-pressed="true" aria-label="暂停飘雪">❄ <span>飘雪中</span></button></div>
+        </div>
       <div class="story">
         <span class="eyebrow"><span></span> 一场关于「被记得」的冒险</span>
         <h1>雪落在苹果镇，<br>故事在等<span>你。</span></h1>
         <p>一口不肯唱歌的钟，一位守了一辈子钟的人。<br>这个平安夜，带上好奇心，去听听他没说出口的愿望。</p>
-        <div class="winter-scene" aria-label="雪夜里的钟楼与小镇" role="img">
-          <div class="moon"></div><div class="stars">✦　　　　·　　　　✧<br>　　·　　　　　✦</div>
-          <div class="hill back"></div><div class="tree tree-one"></div><div class="tree tree-two"></div>
-          <div class="house house-one"></div><div class="house house-two"></div>
-          <div class="tower"><div class="roof"></div><div class="clock"><span></span></div><div class="window"></div><div class="door"></div></div>
-          <div class="hill front"></div><div class="snow"></div>
-          <span class="scene-caption">APPLE TOWN · CHRISTMAS EVE</span>
-        </div>
         <div class="story-footer"><span>✧ 没有倒计时，慢慢来就好</span><span>进度会替你留在这里</span></div>
       </div>
       <div class="paper auth-card">
         <span class="stamp">冬日<br>通行证</span>
-        <span class="eyebrow">WELCOME HOME</span>
+        <span class="eyebrow">YOUR WINTER PASS · 冬日通行证</span>
         <h2 id="auth-title">欢迎回到苹果镇</h2>
         <p id="auth-subtitle" class="muted">登录你的账号，接着上一页故事。</p>
         <div class="tabs" role="tablist" aria-label="账号操作">
@@ -48,7 +47,7 @@
           <p id="auth-error" class="error" role="alert"></p>
           <button id="auth-submit" class="primary full" type="submit">登录，继续故事 <span>→</span></button>
         </form>
-        <p class="privacy">◇ 账号与存档保存在本机，下一次回来依然在。</p>
+        <p class="privacy"><span class="local-save-icon">◇</span> 账号与存档保存在本机，下一次回来依然在。</p>
         <div class="card-note">“别急着送。先看懂，再送。”<small>—— 老圣诞老人</small></div>
       </div>
     </section>
