@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#243e39">
+  <title>苹果镇的平安夜 · 钟楼的歌</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="header">
+    <a href="/" class="brand"><span class="brand-icon">✦</span><span>苹果镇的平安夜<small>THE CHRISTMAS EVE OF APPLE TOWN</small></span></a>
+    <span class="edition">第一封冬日来信 <i>·</i> 钟楼的歌</span>
+    <button id="logout" class="text-button" hidden>退出账号</button>
+  </header>
+  <main>
+    <section id="entry" class="entry">
+      <div class="story">
+        <span class="eyebrow"><span></span> 一场关于「被记得」的冒险</span>
+        <h1>雪落在苹果镇，<br>故事在等<span>你。</span></h1>
+        <p>一口不肯唱歌的钟，一位守了一辈子钟的人。<br>这个平安夜，带上好奇心，去听听他没说出口的愿望。</p>
+        <div class="winter-scene" aria-label="雪夜里的钟楼与小镇" role="img">
+          <div class="moon"></div><div class="stars">✦　　　　·　　　　✧<br>　　·　　　　　✦</div>
+          <div class="hill back"></div><div class="tree tree-one"></div><div class="tree tree-two"></div>
+          <div class="house house-one"></div><div class="house house-two"></div>
+          <div class="tower"><div class="roof"></div><div class="clock"><span></span></div><div class="window"></div><div class="door"></div></div>
+          <div class="hill front"></div><div class="snow"></div>
+          <span class="scene-caption">APPLE TOWN · CHRISTMAS EVE</span>
+        </div>
+        <div class="story-footer"><span>✧ 没有倒计时，慢慢来就好</span><span>进度会替你留在这里</span></div>
+      </div>
+      <div class="paper auth-card">
+        <span class="stamp">冬日<br>通行证</span>
+        <span class="eyebrow">WELCOME HOME</span>
+        <h2 id="auth-title">欢迎回到苹果镇</h2>
+        <p id="auth-subtitle" class="muted">登录你的账号，接着上一页故事。</p>
+        <div class="tabs" role="tablist" aria-label="账号操作">
+          <button id="login-tab" role="tab" aria-selected="true" class="active">登录</button>
+          <button id="register-tab" role="tab" aria-selected="false">创建账号</button>
+        </div>
+        <form id="auth-form">
+          <label for="username">你的账号</label>
+          <input id="username" name="username" autocomplete="username" minlength="3" maxlength="24" placeholder="给这次冒险一个名字" required>
+          <label for="password">密码 <span>至少 8 位</span></label>
+          <div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" placeholder="输入你的密码" required><button id="toggle-password" type="button" aria-label="显示密码">显示</button></div>
+          <div id="confirm-wrap" hidden><label for="confirm">确认密码</label><input id="confirm" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="再输入一次密码"></div>
+          <p id="auth-error" class="error" role="alert"></p>
+          <button id="auth-submit" class="primary full" type="submit">登录，继续故事 <span>→</span></button>
+        </form>
+        <p class="privacy">◇ 账号与存档保存在本机，下一次回来依然在。</p>
+        <div class="card-note">“别急着送。先看懂，再送。”<small>—— 老圣诞老人</small></div>
+      </div>
+    </section>
+    <section id="mode-screen" class="mode-screen" hidden>
+      <span class="eyebrow">A LITTLE CHOICE BEFORE YOUR JOURNEY</span>
+      <h1>让故事，用你喜欢的方式开口。</h1>
+      <p class="muted" id="welcome"></p>
+      <div class="mode-grid">
+        <article class="paper mode-card"><span class="mode-icon">✧</span><span class="eyebrow">LOCAL + YOUR MODEL</span><h2>接入 API · 本地模式</h2><p>让西奥多用你的模型回应。你的探索与存档仍留在本机，角色对话交给你选择的 API。</p><ul><li>自由输入，与西奥多聊聊心事</li><li>自填服务地址、模型与密钥</li><li>连接验证成功后开启</li></ul><button id="choose-api" class="primary full">我愿意，配置 API <span>→</span></button><small>对话将发送给你选择的服务，可能产生 API 费用。</small></article>
+        <article class="paper mode-card offline-card"><span class="mode-icon">❋</span><span class="eyebrow">OFFLINE & UNHURRIED</span><h2>暂不接入 · 离线模式</h2><p>沿着预设对白探索钟楼。无需密钥，也不需要联网，安静地享受这一晚的故事。</p><ul><li>预设的西奥多对白</li><li>同样可以探索、收集线索和读档</li><li>随时回来切换模式</li></ul><button id="choose-offline" class="secondary full">暂不同意，离线出发 <span>→</span></button><small>两种模式共享同一个账号存档。</small></article>
+      </div>
+      <p id="mode-error" class="error" role="alert"></p>
+      <button id="resume" class="text-button" hidden>沿用上次的模式，读取存档 →</button>
+    </section>
+    <section id="game-screen" hidden>
+      <div class="game-heading"><div><span class="eyebrow">CHAPTER 01 · THE SONG OF THE CLOCK TOWER</span><h1>钟楼的歌</h1><p id="game-welcome" class="muted"></p></div><div class="game-status"><span id="mode-badge" class="badge"></span><button id="change-mode" class="text-button">切换模式 / API</button><p id="save-status" role="status"></p></div></div>
+      <div class="game-grid">
+        <aside class="paper places"><span class="eyebrow">今晚，去哪里？</span><h2>小镇地图</h2><nav id="locations" aria-label="探索地点"></nav></aside>
+        <article class="paper exploration"><span class="eyebrow">一封未寄出的愿望</span><h2 id="location-title"></h2><div class="location-art"><span id="location-symbol">◷</span><span class="art-stars">✧　　·　　✦</span></div><h3 id="clue-title"></h3><p id="clue-description"></p><button id="collect" class="primary full"></button><div class="quest"><h3>✧ 今晚的愿望清单</h3><p id="quest-text"></p><div class="progress-track"><div id="progress-fill"></div></div><button id="wish-open" class="secondary full">猜猜西奥多的愿望</button></div><p id="game-error" class="error" role="alert"></p></article>
+        <aside class="right-column"><article class="paper notebook"><span class="eyebrow">留住那些小小的发现</span><h2>你的口袋日记 <span id="clue-count"></span></h2><div id="clue-list"></div><label for="journal">写给下一次回来的自己</label><textarea id="journal" maxlength="2000" rows="3" placeholder="记下你发现的心事……"></textarea><button id="save-journal" class="secondary full">保存日记与当前进度</button></article><article class="paper conversation"><div class="character"><span>♧</span><div><h3>西奥多爷爷</h3><small id="chat-mode"></small></div></div><div id="chat-log" aria-live="polite"></div><form id="chat-form"><label class="sr-only" for="chat-input">对西奥多说的话</label><div class="chat-compose"><input id="chat-input" maxlength="500" placeholder="问问他关于钟楼的故事…" required><button class="primary" type="submit" aria-label="发送对话">↑</button></div></form></article></aside>
+      </div>
+    </section>
+  </main>
+  <footer class="footer"><span>✦ 苹果镇邮局 · 为每一个愿望留一盏灯</span><span>本地存档 / 温柔探索 / 一个平安夜</span></footer>
+  <dialog id="api-dialog" class="paper"><button id="close-api" class="dialog-close" aria-label="关闭">×</button><span class="eyebrow">BRING YOUR OWN MODEL</span><h2>给西奥多一个声音</h2><p class="muted">支持 OpenAI 兼容的 Chat Completions 接口。</p><form id="api-form"><label for="base-url">API 基础地址</label><input id="base-url" type="url" placeholder="https://api.openai.com/v1" required><small>填写基础地址；本机模型可用 http://127.0.0.1:端口/v1。</small><label for="model">模型名称</label><input id="model" placeholder="例如 gpt-4o-mini，或服务中的模型 ID" maxlength="200" required><label for="api-key">API 密钥</label><input id="api-key" type="password" autocomplete="off" placeholder="输入你自己的密钥" maxlength="4096" required><small>密钥使用 Windows 系统加密保存在本机，不会回显。验证会发起一次小请求。</small><p id="api-error" class="error" role="alert"></p><button id="activate-api" class="primary full" type="submit">验证并激活 API →</button></form></dialog>
+  <dialog id="wish-dialog" class="paper"><button id="close-wish" class="dialog-close" aria-label="关闭">×</button><span class="eyebrow">LISTEN WITH YOUR HEART</span><h2>他真正想要什么？</h2><p class="muted">猜错也没关系。每一次倾听，都在靠近他。</p><div class="wish-options"><button class="secondary" data-wish="travel">一张去月亮湾的新船票</button><button class="secondary" data-wish="repair">一口修好的钟</button><button class="primary" data-wish="remember">有人记得年轻时的他</button></div><p id="wish-error" class="error" role="alert"></p></dialog>
+  <div id="toast" role="status" hidden></div>
+</body>
+</html>
