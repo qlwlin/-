@@ -169,13 +169,98 @@ class RuleFlow(unittest.TestCase):
             game.chat(self.p, "舞台", broken)
             self.assertEqual(self.p["message"], "那个舞台是空的。我觉得空着有点可惜。")
         prompts = []
+        seen = []
         def model(prompt, history, text):
             prompts.append(prompt)
+            seen.append((list(history), text))
             return "因为纸板能画成山。然后木偶就能走过去。"
         game.chat(self.p, "你会演吗", model)
         self.assertEqual(len(prompts), 1)
         self.assertNotIn("prepared", prompts[0])
-        self.assertEqual(game.nora_scene(self.p), "park")
+        self.assertIn("追问", prompts[0])
+        self.assertEqual(self.p["message"], "因为纸板能画成山。然后木偶就能走过去。")
+        self.assertEqual(self.p["nora_hold"], "square")
+        game.chat(self.p, "然后木偶呢", model)
+        self.assertEqual(seen[-1][1], "然后木偶呢")
+        self.assertTrue(any(item["content"] == "你会演吗" for item in seen[-1][0]))
+        self.assertEqual(game.nora_scene(self.p), "square")
+        self.assertEqual(len(self.p["chat"]), 8)
+        game.chat(self.p, "再见", model)
+        self.assertIsNone(self.p.get("nora_hold"))
+        away = game.new_game()
+        away.update(alias="艾拉", scene="square", position=[4.2, 6.6])
+        for line in ("在写什么", "舞台", "今天做什么"):
+            game.chat(away, line)
+        self.assertEqual(game.nora_scene(away), "park")
+        self.assertIn("皮普", away["message"])
+
+    def test_pickups_do_not_respawn_and_can_be_dropped(self):
+        with self.assertRaises(game.RuleError):
+            self.do("drop_item", item="socks")
+        self.do("alias", text="艾拉")
+        self.hit("down")
+        self.hit("glasses")
+        self.assertEqual(self.p["inventory"].get("glasses"), 1)
+        self.assertNotIn("glasses", [obj["id"] for obj in game.objects(self.p)])
+        self.do("glasses")
+        self.assertTrue(self.p["glasses"])
+        self.do("drop_item", item="glasses")
+        self.assertNotIn("glasses", self.p["inventory"])
+        self.assertFalse(self.p["glasses"])
+        ground = [obj for obj in game.objects(self.p) if obj["kind"] == "pickup"]
+        self.assertEqual([(obj["item"], obj["amount"]) for obj in ground], [("glasses", 1)])
+        self.assertNotIn("glasses", [obj["id"] for obj in game.objects(self.p)])
+        self.hit(ground[0]["id"])
+        self.assertEqual(self.p["inventory"].get("glasses"), 1)
+        self.assertFalse(any(obj["kind"] == "pickup" for obj in game.objects(self.p)))
+        self.do("glasses")
+        self.hit("park")
+        self.hit("square")
+        self.hit("well")
+        self.assertEqual(self.p["inventory"].get("coin"), 1)
+        self.assertNotIn("well", [obj["id"] for obj in game.objects(self.p)])
+        self.do("glasses")
+        door = next(obj for obj in game.objects(self.p) if obj["id"] == "park")
+        self.p["position"] = [door["x"], door["y"]]
+        with self.assertRaises(game.RuleError):
+            self.do("interact", target="park")
+        self.do("glasses")
+        self.hit("lanes")
+        self.hit("workshop")
+        self.hit("socks")
+        self.assertNotIn("socks", [obj["id"] for obj in game.objects(self.p)])
+        self.do("drop_item", item="socks")
+        pile = next(obj for obj in game.objects(self.p) if obj["kind"] == "pickup")
+        self.assertEqual(pile["amount"], 3)
+        self.hit(pile["id"])
+        self.assertEqual(self.p["inventory"].get("socks"), 3)
+
+
+class ApiRange(unittest.TestCase):
+    def test_provider_endpoints_and_reply_shapes(self):
+        url, kind = server.conversation_endpoint("https://api.deepseek.com/v1", "auto", "deepseek-chat")
+        self.assertEqual((kind, url), ("openai", "https://api.deepseek.com/v1/chat/completions"))
+        url, kind = server.conversation_endpoint("https://api.anthropic.com/v1", "auto", "claude")
+        self.assertEqual((kind, url), ("anthropic", "https://api.anthropic.com/v1/messages"))
+        url, kind = server.conversation_endpoint("https://generativelanguage.googleapis.com/v1beta", "gemini", "gemini-2.5-flash")
+        self.assertEqual(kind, "gemini")
+        self.assertIn("/models/gemini-2.5-flash:generateContent", url)
+        url, kind = server.conversation_endpoint("http://127.0.0.1:11434", "ollama", "llama3.2")
+        self.assertEqual((kind, url), ("ollama", "http://127.0.0.1:11434/api/chat"))
+        url, kind = server.conversation_endpoint(
+            "https://example.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-10-21",
+            "openai", "gpt-4o")
+        self.assertEqual(url.count("chat/completions"), 1)
+        self.assertIn("api-version=2024-10-21", url)
+        with self.assertRaises(server.GameError):
+            server.conversation_endpoint("http://example.com/v1", "openai", "x")
+        self.assertEqual(server.message_text({"choices": [{"message": {"content": [{"type": "text", "text": "因为。"}]}}]}), "因为。")
+        self.assertEqual(server.message_text({"content": [{"type": "text", "text": "然后。"}]}), "然后。")
+        self.assertEqual(server.message_text({"candidates": [{"content": {"parts": [{"text": "可是。"}]}}]}), "可是。")
+        self.assertEqual(server.message_text({"message": {"content": "大概。"}}), "大概。")
+        long_line = "因为纸板能画成山。然后木偶从山上走下来。可是山有点歪。再画一笔画平。"
+        self.assertEqual(game.nora_line(long_line).count("。"), 3)
+        self.assertIsNone(game.nora_line("你应该去社区中心。"))
 
 
 class MockModel(BaseHTTPRequestHandler):

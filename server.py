@@ -13,7 +13,8 @@ import secrets
 import sqlite3
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlsplit
+import ipaddress
+from urllib.parse import quote, urlsplit, urlunsplit
 from urllib.request import Request
 from urllib.error import HTTPError, URLError
 import game
@@ -64,6 +65,9 @@ def initialize():
             user_id INTEGER PRIMARY KEY REFERENCES users(id), progress TEXT NOT NULL,
             updated_at INTEGER NOT NULL);
         """)
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(settings)")}
+        if "provider" not in columns:
+            conn.execute("ALTER TABLE settings ADD COLUMN provider TEXT NOT NULL DEFAULT 'auto'")
         for row in conn.execute("SELECT * FROM saves").fetchall():
             progress = json.loads(row["progress"])
             if progress.get("schema") != game.VERSION:
@@ -103,42 +107,204 @@ def protect_key(value, decrypt=False):
         ctypes.windll.kernel32.LocalFree(result.data)
 
 
-def api_url(base_url):
-    parts = urlsplit(base_url)
-    if (parts.scheme not in ("https", "http") or not parts.hostname or parts.username
-            or parts.password or parts.query or parts.fragment):
-        raise GameError("请输入有效的 API 基础地址，例如 https://api.openai.com/v1。")
-    if parts.scheme == "http" and parts.hostname not in ("localhost", "127.0.0.1", "::1"):
-        raise GameError("远程 API 地址必须使用 HTTPS；本机模型可以使用 HTTP。")
-    return base_url.rstrip("/") + "/chat/completions"
+PROVIDERS = ("auto", "openai", "anthropic", "gemini", "ollama")
 
 
-def completion(base_url, model, key, messages, max_tokens=220):
-    endpoint = api_url(base_url)
-    body = json.dumps({"model": model, "messages": messages, "max_tokens": max_tokens,
-                       "stream": False}).encode()
-    req = Request(endpoint, data=body, headers={"Authorization": f"Bearer {key}",
-                                              "Content-Type": "application/json"}, method="POST")
+def local_target(hostname):
+    name = (hostname or "").strip("[]").lower()
+    if name == "localhost":
+        return True
+    try:
+        address = ipaddress.ip_address(name)
+    except ValueError:
+        return False
+    return address.is_loopback or address.is_private or address.is_link_local
+
+
+def conversation_endpoint(base_url, provider, model):
+    """把基础地址或完整对话地址收成某一种模型接口。"""
+    parts = urlsplit((base_url or "").strip())
+    if (parts.scheme not in ("https", "http") or not parts.hostname
+            or parts.username or parts.password or parts.fragment):
+        raise GameError("请输入有效的接口地址。可以填服务商的基础地址，或完整的对话地址。")
+    if parts.scheme == "http" and not local_target(parts.hostname):
+        raise GameError("远程接口必须使用 HTTPS。本机或局域网的模型可以使用 HTTP。")
+    kind = (provider or "auto").strip().lower()
+    if kind not in PROVIDERS:
+        raise GameError("不认识这种接口。请选择自动识别、OpenAI 兼容、Anthropic、Gemini 或 Ollama。")
+    path = (parts.path or "").rstrip("/")
+    low_host, low_path = parts.hostname.lower(), path.lower()
+    if kind == "auto":
+        if "anthropic.com" in low_host or low_path.endswith("/messages"):
+            kind = "anthropic"
+        elif ("googleapis.com" in low_host or "generativelanguage" in low_host
+              or "generatecontent" in low_path):
+            kind = "gemini"
+        elif low_path.endswith("/api/chat"):
+            kind = "ollama"
+        else:
+            kind = "openai"
+    if kind == "openai" and not low_path.endswith("/chat/completions"):
+        path += "/chat/completions"
+    elif kind == "anthropic" and not low_path.endswith("/messages"):
+        path += "/messages"
+    elif kind == "ollama" and not low_path.endswith("/api/chat"):
+        path += "/api/chat"
+    elif kind == "gemini" and "generatecontent" not in low_path:
+        if path in ("", "/v1", "/v1beta"):
+            path = (path or "/v1beta") + "/models"
+        elif not low_path.endswith("/models"):
+            path += "/models"
+        path += "/" + quote((model or "").strip(), safe="") + ":generateContent"
+    return urlunsplit((parts.scheme, parts.netloc, path, parts.query, "")), kind
+
+
+def plain_messages(messages):
+    cleaned = []
+    for item in messages or []:
+        if not isinstance(item, dict):
+            continue
+        role, content = item.get("role"), item.get("content")
+        if role not in ("system", "user", "assistant") or not isinstance(content, str) or not content.strip():
+            continue
+        cleaned.append({"role": role, "content": content.strip()[:4000]})
+    return cleaned
+
+
+def merge_turns(turns):
+    merged = []
+    for turn in turns:
+        if merged and merged[-1]["role"] == turn["role"]:
+            merged[-1]["content"] += "\n" + turn["content"]
+        else:
+            merged.append(dict(turn))
+    if merged and merged[0]["role"] != "user":
+        merged.insert(0, {"role": "user", "content": "……"})
+    return merged
+
+
+def build_payloads(kind, model, messages, max_tokens):
+    msgs = plain_messages(messages)
+    if kind == "anthropic":
+        system = "\n".join(item["content"] for item in msgs if item["role"] == "system")
+        dialog = merge_turns([item for item in msgs if item["role"] != "system"])
+        return [{"model": model, "max_tokens": max_tokens, "system": system, "messages": dialog}]
+    if kind == "gemini":
+        system = "\n".join(item["content"] for item in msgs if item["role"] == "system")
+        dialog = []
+        for item in msgs:
+            if item["role"] == "system":
+                continue
+            role = "model" if item["role"] == "assistant" else "user"
+            dialog.append({"role": role, "content": item["content"]})
+        dialog = merge_turns(dialog)
+        contents = [{"role": item["role"], "parts": [{"text": item["content"]}]} for item in dialog]
+        body = {"contents": contents, "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8}}
+        if system:
+            body["systemInstruction"] = {"parts": [{"text": system}]}
+        return [body]
+    if kind == "ollama":
+        return [{"model": model, "messages": msgs, "stream": False,
+                 "options": {"temperature": 0.8, "num_predict": max_tokens}}]
+    base = {"model": model, "messages": msgs, "stream": False}
+    return [{**base, "max_tokens": max_tokens, "temperature": 0.8},
+            {**base, "max_completion_tokens": max_tokens}]
+
+
+def join_content(content):
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    bits = []
+    for part in content:
+        if isinstance(part, str):
+            bits.append(part)
+        elif isinstance(part, dict):
+            if isinstance(part.get("text"), str):
+                bits.append(part["text"])
+            elif isinstance(part.get("content"), str):
+                bits.append(part["content"])
+    return "".join(bits)
+
+
+def message_text(data):
+    if not isinstance(data, dict):
+        raise ValueError()
+    choices = data.get("choices")
+    if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+        first = choices[0]
+        message = first.get("message") if isinstance(first.get("message"), dict) else {}
+        text = join_content(message.get("content"))
+        if text.strip():
+            return text
+        if isinstance(first.get("text"), str) and first["text"].strip():
+            return first["text"]
+    if isinstance(data.get("content"), list):
+        text = join_content(data["content"])
+        if text.strip():
+            return text
+    candidates = data.get("candidates")
+    if isinstance(candidates, list) and candidates and isinstance(candidates[0], dict):
+        parts = ((candidates[0].get("content") or {}).get("parts")) or []
+        text = join_content(parts)
+        if text.strip():
+            return text
+    message = data.get("message")
+    if isinstance(message, dict):
+        text = join_content(message.get("content"))
+        if text.strip():
+            return text
+    if isinstance(data.get("response"), str) and data["response"].strip():
+        return data["response"]
+    raise ValueError()
+
+
+def completion(base_url, model, key, messages, max_tokens=220, provider="auto"):
+    endpoint, kind = conversation_endpoint(base_url, provider, model)
+    headers = {"Content-Type": "application/json"}
+    if key:
+        if kind == "anthropic":
+            headers["x-api-key"] = key
+            headers["anthropic-version"] = "2023-06-01"
+        elif kind == "gemini":
+            headers["x-goog-api-key"] = key
+        else:
+            headers["Authorization"] = "Bearer " + key
+            if "azure" in (urlsplit(endpoint).hostname or ""):
+                headers["api-key"] = key
+    payloads = build_payloads(kind, model, messages, max_tokens)
     # 不跟随重定向，避免密钥被转发到其他地址。
     from urllib.request import build_opener, HTTPRedirectHandler
     class NoRedirect(HTTPRedirectHandler):
         def redirect_request(self, *args, **kwargs):
             return None
-    try:
-        with build_opener(NoRedirect).open(req, timeout=30) as response:
-            data = json.loads(response.read(1024 * 1024))
-        content = data["choices"][0]["message"]["content"]
-        if not isinstance(content, str) or not content.strip():
-            raise ValueError()
-        return content.strip()[:4000]
-    except HTTPError as exc:
-        messages_by_code = {401: "API 密钥无效或已过期。", 403: "API 无访问权限，请检查密钥和模型。",
-                            404: "API 地址或模型不存在。", 429: "API 配额不足或请求过于频繁。"}
-        raise GameError(messages_by_code.get(exc.code, f"API 返回错误（HTTP {exc.code}），请检查配置。"), 502)
-    except (URLError, TimeoutError, OSError):
-        raise GameError("无法连接 API，请检查地址、网络或本机模型服务。", 502)
-    except (ValueError, KeyError, IndexError, TypeError):
-        raise GameError("API 返回格式不兼容，需要 OpenAI Chat Completions 接口。", 502)
+    opener = build_opener(NoRedirect)
+    last_format_error = False
+    for index, payload in enumerate(payloads):
+        req = Request(endpoint, data=json.dumps(payload).encode(), headers=headers, method="POST")
+        try:
+            with opener.open(req, timeout=45) as response:
+                data = json.loads(response.read(1024 * 1024))
+            content = message_text(data)
+            if not content.strip():
+                raise ValueError()
+            return content.strip()[:4000]
+        except HTTPError as exc:
+            if exc.code == 400 and index < len(payloads) - 1:
+                continue
+            messages_by_code = {401: "API 密钥无效或已过期。", 403: "API 无访问权限，请检查密钥和模型。",
+                                404: "API 地址或模型不存在。", 429: "API 配额不足或请求过于频繁。"}
+            raise GameError(messages_by_code.get(exc.code, f"API 返回错误（HTTP {exc.code}），请检查配置。"), 502)
+        except (URLError, TimeoutError, OSError):
+            raise GameError("无法连接 API，请检查地址、网络或本机模型服务。", 502)
+        except (ValueError, KeyError, IndexError, TypeError, json.JSONDecodeError):
+            last_format_error = True
+            if index < len(payloads) - 1:
+                continue
+    if last_format_error:
+        raise GameError("API 返回格式无法识别。可以换一种接口，或改填服务商给的完整对话地址。", 502)
+    raise GameError("API 没有返回可用的回答。", 502)
 
 
 def new_progress():
@@ -189,7 +355,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def state(self, conn, uid):
         user = conn.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone()
-        settings = conn.execute("SELECT mode,base_url,model FROM settings WHERE user_id=?", (uid,)).fetchone()
+        settings = conn.execute("SELECT mode,base_url,model,provider FROM settings WHERE user_id=?", (uid,)).fetchone()
         save = conn.execute("SELECT * FROM saves WHERE user_id=?", (uid,)).fetchone()
         progress = json.loads(save["progress"])
         slots = []
@@ -227,6 +393,7 @@ class Handler(BaseHTTPRequestHandler):
                      "/style.css": ("style.css", "text/css"),
                      "/login.css": ("login.css", "text/css"),
                      "/login-scene.js": ("login-scene.js", "text/javascript"),
+                     "/i18n.js": ("i18n.js", "text/javascript"),
                      "/scene.js": ("scene.js", "text/javascript")}
             if path not in files:
                 raise GameError("页面不存在。", 404)
@@ -268,12 +435,18 @@ class Handler(BaseHTTPRequestHandler):
                     base = str(data.get("base_url", "")).strip()
                     model = str(data.get("model", "")).strip()
                     key = str(data.get("key", "")).strip()
-                    if not model or len(model) > 200 or not key or len(key) > 4096 or len(base) > 1000:
-                        raise GameError("请填写 API 地址、模型名称和密钥。")
-                    completion(base, model, key, [{"role": "user", "content": "请简短回复：连接成功。"}], 32)
-                    encrypted = protect_key(key)
-                    conn.execute("UPDATE settings SET mode='local',base_url=?,model=?,encrypted_key=? WHERE user_id=?",
-                                 (base.rstrip("/"), model, encrypted, uid))
+                    provider = str(data.get("provider") or "auto").strip().lower()
+                    if provider not in PROVIDERS:
+                        raise GameError("不认识这种接口。请选择自动识别、OpenAI 兼容、Anthropic、Gemini 或 Ollama。")
+                    if not model or len(model) > 200 or len(key) > 4096 or not base or len(base) > 1000:
+                        raise GameError("请填写接口地址和模型名称。")
+                    kind = conversation_endpoint(base, provider, model)[1]
+                    if not key and kind != "ollama" and not local_target(urlsplit(base).hostname):
+                        raise GameError("请填写 API 密钥。本机或局域网的模型可以留空。")
+                    completion(base, model, key, [{"role": "user", "content": "请简短回复：连接成功。"}], 32, provider)
+                    encrypted = protect_key(key) if key else ""
+                    conn.execute("UPDATE settings SET mode='local',base_url=?,model=?,encrypted_key=?,provider=? WHERE user_id=?",
+                                 (base.rstrip("/"), model, encrypted, provider, uid))
                     conn.commit()
                     self.send_json(self.state(conn, uid))
                 elif path == "/api/action":
@@ -369,10 +542,11 @@ class Handler(BaseHTTPRequestHandler):
                 if state["settings"]["mode"] == "local":
                     settings = conn.execute("SELECT * FROM settings WHERE user_id=?", (uid,)).fetchone()
                     def ai(prompt, history, text):
-                        return completion(settings["base_url"], settings["model"],
-                                          protect_key(settings["encrypted_key"], True),
+                        secret = protect_key(settings["encrypted_key"], True) if settings["encrypted_key"] else ""
+                        return completion(settings["base_url"], settings["model"], secret,
                                           [{"role": "system", "content": prompt}] + history
-                                          + [{"role": "user", "content": text}], 160)
+                                          + [{"role": "user", "content": text}], 280,
+                                          settings["provider"] or "auto")
                 game.act(progress, data, ai)
         except game.RuleError as exc:
             raise GameError(str(exc))

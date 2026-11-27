@@ -2,53 +2,67 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#292d30"><title>苹果镇 · 圣诞老人的木偶戏</title>
+  <meta name="theme-color" content="#292d30"><title data-i18n="ui.title">苹果镇 · 圣诞老人的木偶戏</title>
   <link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/login.css">
-  <script src="/scene.js" defer></script><script src="/login-scene.js" defer></script><script src="/app.js" defer></script>
+  <script src="/scene.js" defer></script><script src="/login-scene.js" defer></script><script src="/i18n.js" defer></script><script src="/app.js" defer></script>
 </head>
 <body>
   <main>
     <section id="entry" class="entry">
-      <canvas id="login-scene" width="320" height="240" aria-label="PS1包浆风格的英伦小镇，湿灰瓦屋顶、红砖花店、面包房、暖黄窗光和老橡树树屋"></canvas>
+      <canvas id="login-scene" width="320" height="240" data-i18n-aria="ui.login-canvas" aria-label="PS1包浆风格的英伦小镇，湿灰瓦屋顶、红砖花店、面包房、暖黄窗光和老橡树树屋"></canvas>
       <div class="login-shade"></div>
-      <header class="login-header"><a href="/" class="wordmark">APPLE TOWN <span>苹果镇</span></a><span>一段小镇的圣诞故事 · 01</span></header>
-      <div class="story"><span class="eyebrow">A SMALL STAGE. A LITTLE CHRISTMAS.</span><h1>故事已经写好，<br>就差一座<span>小舞台。</span></h1><p>戴上旧墨镜，做一天新邻居。<br>把一场木偶戏，悄悄留给圣诞早晨。</p><div class="story-foot"><span>圣诞老人的木偶戏</span><span>键盘移动 / 鼠标互动</span></div></div>
+      <header class="login-header"><a href="/" class="wordmark">APPLE TOWN <span>苹果镇</span></a><span data-i18n="ui.header-note">一段小镇的圣诞故事 · 01</span></header>
+      <div class="story"><span class="eyebrow" data-i18n="ui.story-kicker">A SMALL STAGE. A LITTLE CHRISTMAS.</span><h1 data-i18n-html="ui.story-title">故事已经写好，<br>就差一座<span>小舞台。</span></h1><p data-i18n-html="ui.story-body">戴上旧墨镜，做一天新邻居。<br>把一场木偶戏，悄悄留给圣诞早晨。</p><div class="story-foot"><span data-i18n="ui.story-name">圣诞老人的木偶戏</span><span data-i18n="ui.story-controls">WASD 移动 / 鼠标也能点</span></div></div>
       <article class="auth-card paper">
-        <span class="stamp">冬日<br>通行证</span><span class="eyebrow">YOUR WINTER PASS</span>
-        <h2 id="auth-title">欢迎回到苹果镇</h2><p class="muted" id="auth-subtitle">登录，让故事接着上一页。</p>
-        <div class="tabs"><button id="login-tab" class="active" type="button">登录</button><button id="register-tab" type="button">创建账号</button></div>
+        <span class="stamp" data-i18n-html="ui.stamp">冬日<br>通行证</span><span class="eyebrow" data-i18n="ui.pass-kicker">YOUR WINTER PASS</span>
+        <h2 id="auth-title" data-i18n="auth.title">欢迎回到苹果镇</h2><p class="muted" id="auth-subtitle" data-i18n="auth.subtitle">登录，让故事接着上一页。</p>
+        <div class="tabs"><button id="login-tab" class="active" type="button" data-i18n="auth.login">登录</button><button id="register-tab" type="button" data-i18n="auth.register">创建账号</button></div>
         <form id="auth-form">
-          <label for="username">账号</label><input id="username" autocomplete="username" minlength="3" maxlength="24" placeholder="你的冬日通行证" required>
-          <label for="password">密码 <small>至少 8 位</small></label><div class="password-wrap"><input id="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required><button id="toggle-password" type="button">显示</button></div>
-          <div id="confirm-wrap" hidden><label for="confirm">确认密码</label><input id="confirm" type="password" autocomplete="new-password" minlength="8" maxlength="128"></div>
-          <p id="auth-error" class="error" role="alert"></p><button id="auth-submit" class="primary full" type="submit">登录，继续故事 →</button>
+          <label for="username" data-i18n="auth.user">账号</label><input id="username" autocomplete="username" minlength="3" maxlength="24" data-i18n-placeholder="auth.user-ph" placeholder="你的冬日通行证" required>
+          <label for="password"><span data-i18n="auth.pass">密码</span> <small data-i18n="auth.pass-hint">至少 8 位</small></label><div class="password-wrap"><input id="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required><button id="toggle-password" type="button" data-i18n="auth.show">显示</button></div>
+          <div id="confirm-wrap" hidden><label for="confirm" data-i18n="auth.confirm">确认密码</label><input id="confirm" type="password" autocomplete="new-password" minlength="8" maxlength="128"></div>
+          <p id="auth-error" class="error" role="alert"></p><button id="auth-submit" class="primary full" type="submit" data-i18n="auth.submit">登录，继续故事 →</button>
         </form>
-        <p class="privacy">◇ 账号与三个挂画存档，保存在这台电脑。</p><div class="card-note">一副墨镜，一个化名。<br>一场不必让人知道是谁准备的演出。</div>
+        <p class="privacy" data-i18n="ui.privacy">◇ 账号与三个挂画存档，保存在这台电脑。</p><div class="card-note" data-i18n-html="ui.card-note">一副墨镜，一个化名。<br>一场不必让人知道是谁准备的演出。</div>
       </article>
-      <footer class="login-footer"><span>英伦冬日 / 暖窗 / 旧木头</span><button id="sound-toggle" type="button">♫ 开启声音</button><span>PS1 · ELECTRONIC PATINA</span></footer>
+      <footer class="login-footer"><span data-i18n="ui.footer-left">英伦冬日 / 暖窗 / 旧木头</span><button id="sound-toggle" type="button" data-i18n="ui.sound-login">♫ 开启声音</button><span data-i18n="ui.footer-right">PS1 · ELECTRONIC PATINA</span></footer>
     </section>
     <section id="mode-screen" class="mode-screen" hidden>
-      <span class="eyebrow">BEFORE YOU STEP INTO TOWN</span><h1>让诺拉开口说她的故事。</h1><p id="welcome" class="muted"></p>
+      <span class="eyebrow" data-i18n="mode.kicker">BEFORE YOU STEP INTO TOWN</span><h1 data-i18n="mode.title">让诺拉开口说她的故事。</h1><p id="welcome" class="muted"></p>
       <div class="mode-grid">
-        <article class="paper"><span class="eyebrow">YOUR MODEL</span><h2>接入自己的 API</h2><p>与九岁的诺拉自由聊聊。她只知道自己的练习本、故事和朋友。</p><button id="choose-api" class="primary full">配置并验证连接 →</button><small>对话发送到你填写的服务，可能产生费用。</small></article>
-        <article class="paper"><span class="eyebrow">OFFLINE</span><h2>离线走进小镇</h2><p>诺拉用预设对白回应。所有制作、夜潜和演出都能完整进行。</p><button id="choose-offline" class="secondary full">离线出发 →</button><small>随时可以回来切换对话方式。</small></article>
-      </div><p id="mode-error" class="error" role="alert"></p><button id="resume" type="button">沿用上次模式 →</button><button id="mode-logout" type="button">退出账号</button>
+        <article class="paper"><span class="eyebrow" data-i18n="mode.api-kicker">YOUR MODEL</span><h2 data-i18n="mode.api-title">接入自己的 API</h2><p data-i18n="mode.api-body">与九岁的诺拉自由聊聊。她只知道自己的练习本、故事和朋友。</p><button id="choose-api" class="primary full" data-i18n="mode.api-btn">配置并验证连接 →</button><small data-i18n="mode.api-note">对话发送到你填写的服务，可能产生费用。</small></article>
+        <article class="paper"><span class="eyebrow" data-i18n="mode.off-kicker">OFFLINE</span><h2 data-i18n="mode.off-title">离线走进小镇</h2><p data-i18n="mode.off-body">诺拉用预设对白回应。所有制作、夜潜和演出都能完整进行。</p><button id="choose-offline" class="secondary full" data-i18n="mode.off-btn">离线出发 →</button><small data-i18n="mode.off-note">随时可以回来切换对话方式。</small></article>
+      </div><p id="mode-error" class="error" role="alert"></p><button id="resume" type="button" data-i18n="mode.resume">沿用上次模式 →</button><button id="mode-logout" type="button" data-i18n="mode.logout">退出账号</button>
     </section>
     <section id="game-screen" class="game-screen" hidden>
-      <canvas id="game-scene" width="320" height="240" aria-label="固定斜俯视苹果镇游戏场景，使用WASD或方向键移动"></canvas>
-      <header class="game-header"><div><span class="eyebrow">APPLE TOWN / THE PUPPET SHOW</span><h1 id="location-name">老橡树 · 树屋</h1><span id="phase-name"></span></div><div class="game-menu"><button id="game-sound" type="button">♫ 声音关</button><button id="change-mode" type="button">对话设置</button><button id="logout" type="button">退出</button></div></header>
-      <aside id="task-panel" class="task-panel paper"><button id="task-toggle" type="button" aria-expanded="false"><span>圣诞清单</span><small>Tab · 展开</small></button><p id="current-goal"></p><div id="task-details" hidden><div id="task-list"></div><h3>摘录的线索</h3><div id="clue-list"></div><label for="journal">自己的笔记</label><textarea id="journal" maxlength="2000" rows="3"></textarea><button id="save-journal" type="button">保存笔记</button><p id="nora-location"></p></div></aside>
-      <div id="interaction-area" class="interaction-area"><div id="nearby-actions"></div><p id="hint">WASD / 方向键移动 · 走近后点击物件 · E 互动 · H 躲藏 · Tab 清单</p></div>
-      <div id="carry-status" class="carry-status" hidden><span id="carry-label"></span><button id="drop-item" type="button">放下</button></div>
-      <div id="hotbar" class="hotbar" aria-label="六格快捷栏"></div>
-      <div id="dialogue" class="dialogue"><span id="portrait" class="portrait">✦</span><div><strong id="speaker">旁白</strong><p id="dialogue-text"></p></div><button id="close-dialogue" type="button" aria-label="收起对话">×</button></div>
-      <div id="chat-box" class="chat-box paper" hidden><div class="topics"><button data-topic="你的故事">你的故事</button><button data-topic="舞台">舞台</button><button data-topic="今天做什么">今天做什么</button><button data-topic="再见">再见</button></div><form id="chat-form"><input id="chat-input" maxlength="500" placeholder="和诺拉说点什么…" aria-label="给诺拉的话" required><button type="submit">说话</button></form></div>
-      <p id="game-error" class="game-error error" role="alert"></p><span id="save-status" class="save-status"></span><button id="restart" class="restart" hidden>重新开始</button>
+      <canvas id="game-scene" width="320" height="240" data-i18n-aria="ui.canvas" aria-label="固定斜俯视苹果镇。WASD移动，E拾取或放下，F对话，T切换场景，鼠标点击同样有效"></canvas>
+      <header class="game-header"><div><span class="eyebrow" data-i18n="ui.game-kicker">APPLE TOWN / THE PUPPET SHOW</span><h1 id="location-name">老橡树 · 树屋</h1><span id="phase-name"></span></div><div class="game-menu"><button id="open-map" type="button" data-i18n="ui.map-btn">地图 M</button><button id="open-tasks" type="button" data-i18n="ui.tasks-btn">任务 V</button><button id="open-settings" type="button" data-i18n="ui.settings-btn">设置 C</button><button id="game-sound" type="button" data-i18n="ui.sound-off">♫ 声音关</button><button id="change-mode" type="button" data-i18n="ui.dialogue-settings">对话设置</button><button id="logout" type="button" data-i18n="ui.logout">退出</button></div></header>
+      <aside id="settings-panel" class="overlay-panel settings-panel paper" hidden>
+        <div class="panel-head"><h2 data-i18n="set.title">设置</h2><button id="close-settings" type="button" data-i18n-aria="ui.close" aria-label="关闭">×</button></div>
+        <h3 data-i18n="set.lang">语言</h3><div class="setting-row" id="lang-options"><button type="button" data-lang="zh">中文</button><button type="button" data-lang="en">English</button></div>
+        <h3 data-i18n="set.clarity">画面清晰度</h3><div class="setting-row" id="clarity-options"><button type="button" data-clarity="low" data-i18n="set.low">低</button><button type="button" data-clarity="mid" data-i18n="set.mid">中</button><button type="button" data-clarity="high" data-i18n="set.high">高</button></div>
+        <p class="muted" id="clarity-note"></p>
+        <h3 data-i18n="set.volume">音量</h3><div class="setting-row volume-row"><button id="vol-down" type="button" data-i18n-aria="set.vol-down" aria-label="减小音量">－</button><input id="volume" type="range" min="0" max="100" value="70" data-i18n-aria="set.volume-aria" aria-label="音量"><button id="vol-up" type="button" data-i18n-aria="set.vol-up" aria-label="增大音量">＋</button><span id="volume-label">70%</span></div>
+        <h3 data-i18n="set.controls">键位</h3><ul id="control-list" class="control-list"></ul>
+        <p class="muted" data-i18n="set.nora">诺拉的自由对话沿用模型的语言。离线时她说预设台词。</p>
+      </aside>
+      <aside id="map-panel" class="overlay-panel map-panel paper" hidden>
+        <div class="panel-head"><h2 data-i18n="map.title">苹果镇</h2><button id="close-map" type="button" data-i18n-aria="ui.close" aria-label="关闭">×</button></div>
+        <p class="muted" id="map-note" data-i18n="map.note">地图只用来查看你在哪里。走到路口或门口，按 T 或点击那里切换场景。</p>
+        <div id="map-board" class="map-board"></div><p id="map-here"></p>
+      </aside>
+      <aside id="task-panel" class="task-panel paper" hidden><button id="task-toggle" type="button"><span data-i18n="ui.tasks">圣诞清单</span><small data-i18n="ui.tasks-close">V · 关闭</small></button><p id="current-goal"></p><div id="task-details"><div id="task-list"></div><h3 data-i18n="ui.clues">摘录的线索</h3><div id="clue-list"></div><label for="journal" data-i18n="ui.notes">自己的笔记</label><textarea id="journal" maxlength="2000" rows="3"></textarea><button id="save-journal" type="button" data-i18n="ui.save-notes">保存笔记</button><p id="nora-location"></p></div></aside>
+      <div id="interaction-area" class="interaction-area"><div id="nearby-actions"></div><p id="hint">WASD 移动 · E 拾取/放下 · F 对话 · T 换场景 · V 任务 · M 地图 · C 设置 · F1–F6 取出 · H 躲藏</p></div>
+      <div id="carry-status" class="carry-status" hidden><span id="carry-label"></span><button id="drop-item" type="button" data-i18n="ui.drop">放下</button></div>
+      <div id="hotbar" class="hotbar" data-i18n-aria="ui.hotbar" aria-label="六格快捷栏"></div>
+      <div id="dialogue" class="dialogue"><span id="portrait" class="portrait">✦</span><div><strong id="speaker">旁白</strong><p id="dialogue-text"></p></div><button id="close-dialogue" type="button" data-i18n-aria="ui.hide-line" aria-label="收起对话">×</button></div>
+      <div id="chat-box" class="chat-box paper" hidden><div id="chat-log" class="chat-log"></div><p class="muted" data-i18n="chat.keep">她还在。可以接着问。</p><div class="topics"><button type="button" data-topic="你的故事" data-i18n="topic.story">你的故事</button><button type="button" data-topic="舞台" data-i18n="topic.stage">舞台</button><button type="button" data-topic="今天做什么" data-i18n="topic.today">今天做什么</button><button type="button" data-topic="再见" data-i18n="topic.bye">再见</button></div><form id="chat-form"><input id="chat-input" maxlength="500" data-i18n-placeholder="chat.placeholder" data-i18n-aria="chat.aria" placeholder="和诺拉说点什么…" aria-label="给诺拉的话" required><button type="submit" data-i18n="chat.send">说话</button></form></div>
+      <p id="game-error" class="game-error error" role="alert"></p><span id="save-status" class="save-status"></span><button id="restart" class="restart" type="button" hidden data-i18n="ui.restart">重新开始</button>
       <div id="cinema" class="cinema" hidden><span id="cinema-title"></span><p id="cinema-text"></p><span id="cinema-progress"></span></div>
     </section>
   </main>
-  <dialog id="api-dialog" class="paper"><button id="close-api" class="dialog-close" type="button" aria-label="关闭">×</button><span class="eyebrow">NORA'S VOICE</span><h2>接入你的模型</h2><form id="api-form"><label for="base-url">OpenAI 兼容基础地址</label><input id="base-url" placeholder="https://api.openai.com/v1" required><label for="model">模型名称</label><input id="model" required><label for="api-key">API 密钥</label><input id="api-key" type="password" autocomplete="off" required><p class="muted">密钥由 Windows 加密保存。只把与诺拉的对话交给这个服务。</p><p id="api-error" class="error" role="alert"></p><button id="activate-api" class="primary full" type="submit">验证并激活 →</button></form></dialog>
-  <dialog id="alias-dialog" class="paper"><span class="eyebrow">A NAME FOR THE DAY</span><h2>今天，你叫什么？</h2><p>居民只会把你当成新邻居。</p><form id="alias-form"><input id="alias-input" maxlength="20" placeholder="填写白天的化名" aria-label="白天的化名" required><p id="alias-error" class="error"></p><button class="primary full" type="submit">从树屋醒来 →</button></form></dialog>
+  <dialog id="api-dialog" class="paper"><button id="close-api" class="dialog-close" type="button" data-i18n-aria="ui.close" aria-label="关闭">×</button><span class="eyebrow" data-i18n="api.kicker">NORA'S VOICE</span><h2 data-i18n="api.title">接入你的模型</h2><form id="api-form"><label for="api-provider" data-i18n="api.provider">接口</label><select id="api-provider"><option value="auto" data-i18n="api.provider.auto">自动识别</option><option value="openai" data-i18n="api.provider.openai">OpenAI 兼容</option><option value="anthropic" data-i18n="api.provider.anthropic">Anthropic</option><option value="gemini" data-i18n="api.provider.gemini">Gemini</option><option value="ollama" data-i18n="api.provider.ollama">Ollama / 本地</option></select><label for="base-url" data-i18n="api.url">接口地址</label><input id="base-url" data-i18n-placeholder="api.url-ph" placeholder="https://api.example.com/v1 ，或服务商给的完整对话地址" required><label for="model" data-i18n="api.model">模型名称</label><input id="model" required><label for="api-key" data-i18n="api.key">API 密钥</label><input id="api-key" type="password" autocomplete="off" data-i18n-placeholder="api.key-ph" placeholder="本地或局域网模型可以留空"><p class="muted" data-i18n="api.note">密钥由 Windows 加密保存。只把与诺拉的对话交给这个服务。</p><p id="api-error" class="error" role="alert"></p><button id="activate-api" class="primary full" type="submit" data-i18n="api.submit">验证并激活 →</button></form></dialog>
+  <dialog id="alias-dialog" class="paper"><span class="eyebrow" data-i18n="alias.kicker">A NAME FOR THE DAY</span><h2 data-i18n="alias.title">今天，你叫什么？</h2><p data-i18n="alias.body">居民只会把你当成新邻居。</p><form id="alias-form"><input id="alias-input" maxlength="20" data-i18n-placeholder="alias.placeholder" data-i18n-aria="alias.aria" placeholder="填写白天的化名" aria-label="白天的化名" required><p id="alias-error" class="error"></p><button class="primary full" type="submit" data-i18n="alias.submit">从树屋醒来 →</button></form></dialog>
   <dialog id="choice-dialog" class="paper"><button id="close-choice" class="dialog-close" type="button">×</button><h2 id="choice-title"></h2><div id="choice-options"></div><p id="choice-error" class="error" role="alert"></p></dialog>
-  <dialog id="warning-dialog" class="paper warning"><h2>差点被发现了</h2><p>“刚才好像有声音……大概是风。”</p><button id="warning-ok" class="primary full">好</button></dialog>
+  <dialog id="warning-dialog" class="paper warning"><h2 data-i18n="warn.title">差点被发现了</h2><p data-i18n="warn.body">“刚才好像有声音……大概是风。”</p><button id="warning-ok" class="primary full" type="button" data-i18n="ui.ok">好</button></dialog>
 </body></html>

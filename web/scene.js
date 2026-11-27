@@ -4,22 +4,35 @@ class PatinaScene {
   constructor(canvas, login=false) {
     this.canvas=canvas;this.ctx=canvas.getContext("2d",{willReadFrequently:true});
     this.raw=document.createElement("canvas");this.raw.width=320;this.raw.height=240;
-    this.c=this.raw.getContext("2d");this.login=login;this.state=null;this.position=[5,8];
+    this.c=this.raw.getContext("2d",{willReadFrequently:true});this.login=login;this.state=null;this.position=[5,8];
     this.frame=0;this.last=0;this.hits=[];this.onSelect=null;
-    canvas.addEventListener("click",e=>{
+    this.scale=1;this.patina=1;this.colorStep=8;
+    canvas.addEventListener("pointerdown",e=>{
       if(this.login)return;
-      const box=canvas.getBoundingClientRect(),scale=Math.min(box.width/320,box.height/240);
-      const x=(e.clientX-box.left-(box.width-320*scale)/2)/scale;
-      const y=(e.clientY-box.top-(box.height-240*scale)/2)/scale;
+      const rect=canvas.getBoundingClientRect();
+      const cw=canvas.width,ch=canvas.height,disp=Math.min(rect.width/cw,rect.height/ch);
+      const ox=(rect.width-cw*disp)/2,oy=(rect.height-ch*disp)/2;
+      const x=((e.clientX-rect.left-ox)/disp)/(this.scale||1);
+      const y=((e.clientY-rect.top-oy)/disp)/(this.scale||1);
+      if(x<0||y<0||x>320||y>240)return;
       const hit=this.hits.filter(h=>Math.hypot(h.x-x,h.y-y)<h.r).sort((a,b)=>Math.hypot(a.x-x,a.y-y)-Math.hypot(b.x-x,b.y-y))[0];
-      if(hit&&this.onSelect)this.onSelect(hit.obj);
+      if(hit&&this.onSelect){e.preventDefault();this.onSelect(hit.obj);}
     });
     this.loop=this.loop.bind(this);requestAnimationFrame(this.loop);
   }
   set(state){this.state=state;this.position=state.progress.position.slice();}
+  setClarity(level){
+    const presets={low:{scale:1,patina:1,step:8,smooth:false},mid:{scale:1.5,patina:.45,step:4,smooth:false},high:{scale:2,patina:.18,step:1,smooth:true}};
+    const preset=presets[level]||presets.low;
+    this.scale=preset.scale;this.patina=preset.patina;this.colorStep=preset.step;
+    const w=Math.round(320*preset.scale),h=Math.round(240*preset.scale);
+    this.raw.width=w;this.raw.height=h;this.canvas.width=w;this.canvas.height=h;
+    this.canvas.style.imageRendering=preset.smooth?"auto":"pixelated";
+  }
   hash(x,y,seed=0){const v=Math.sin(x*127.1+y*311.7+seed*23.13)*43758.5453;return v-Math.floor(v);}
   poly(points,color,grain=false) {
-    const c=this.c; c.fillStyle=color;c.beginPath();points.forEach(([x,y],i)=>i?c.lineTo(Math.round(x),Math.round(y)):c.moveTo(Math.round(x),Math.round(y)));c.closePath();c.fill();
+    const c=this.c,snap=v=>this.scale>1?v:Math.round(v);
+    c.fillStyle=color;c.beginPath();points.forEach(([x,y],i)=>i?c.lineTo(snap(x),snap(y)):c.moveTo(snap(x),snap(y)));c.closePath();c.fill();
     if(grain) {c.save();c.clip();const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);
       const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
       for(let y=minY;y<maxY;y+=2)for(let x=minX;x<maxX;x+=3){const v=this.hash(x,y);c.fillStyle=v>.6?"#dbc39425":"#111b2433";c.fillRect(Math.floor(x+(y%4)),Math.floor(y),v>.8?4:1,1);}
@@ -126,6 +139,7 @@ class PatinaScene {
     }else if(kind==="puddle"||kind==="creak"){
       this.poly([[xx-9,yy],[xx-4,yy-4],[xx+9,yy],[xx+2,yy+4]],kind==="puddle"?"#81999b":"#77644e",true);
     }else if(kind==="glasses"){c.fillStyle="#181f23";c.fillRect(xx-5,yy-2,4,3);c.fillRect(xx+1,yy-1,4,3);c.fillRect(xx-1,yy,3,1);
+    }else if(kind==="pickup"){this.box(x,y,.42,.42,7,["#cbb98a","#7d6244","#efe2c0"]);c.fillStyle="#3e3428";c.fillRect(xx-4,yy-10,8,5);
     }else if(kind==="bike"){c.strokeStyle="#8f947f";c.strokeRect(xx-9,yy-8,7,7);c.strokeRect(xx+4,yy-2,7,7);c.beginPath();c.moveTo(xx-5,yy-4);c.lineTo(xx+4,yy-10);c.lineTo(xx+7,yy+2);c.stroke();
     }else if(kind==="glass"||kind==="cup"||kind==="jar"||kind==="bell"){this.box(x,y,.32,.32,7,["#b6b49c","#7d897f","#d8ccb2"]);}
     else {this.box(x,y,.8,.75,10,["#917b56","#5d5540","#b7a579"]);}
@@ -160,6 +174,7 @@ class PatinaScene {
   }
   render(){
     const c=this.c;this.hits=[];
+    c.setTransform(this.scale||1,0,0,this.scale||1,0,0);
     if(this.login||!this.state)this.town();
     else {
       const p=this.state.progress,w=this.state.world,scene=w.scenes[p.scene],night=p.phase==="night";
@@ -183,14 +198,20 @@ class PatinaScene {
     this.post();
   }
   post(){
-    const c=this.c,image=c.getImageData(0,0,320,240),data=image.data;
+    const c=this.c;
+    c.setTransform(1,0,0,1,0,0);
+    const w=this.raw.width,h=this.raw.height,image=c.getImageData(0,0,w,h),data=image.data;
     const matrix=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
-    for(let y=0;y<240;y++)for(let x=0;x<320;x++){
-      const idx=(y*320+x)*4,d=(matrix[(y%4)*4+x%4]-7.5)*1.2;
-      const grain=(this.hash(x,y,this.frame%5)-.5)*23; // 约15%的可见颗粒。
-      const vig=1-Math.min(.35,((x-160)**2/38000+(y-120)**2/24000)*.12);
-      const block=(this.hash(x>>3,y>>3)-.5)*5; // JPEG 8×8 宏块的亮度偏移。
-      for(let k=0;k<3;k++)data[idx+k]=Math.max(0,Math.min(255,Math.round((data[idx+k]*vig+d+grain+block)/8)*8));
+    const patina=this.patina??1,step=this.colorStep||8,s=this.scale||1;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const idx=(y*w+x)*4,d=(matrix[(y%4)*4+(x%4)]-7.5)*1.2*patina;
+      const grain=(this.hash(x,y,this.frame%5)-.5)*23*patina;
+      const vig=1-Math.min(.35,((x-w/2)**2/(38000*s*s)+(y-h/2)**2/(24000*s*s))*.12);
+      const block=(this.hash(x>>3,y>>3)-.5)*5*patina;
+      for(let k=0;k<3;k++){
+        const value=data[idx+k]*vig+d+grain+block;
+        data[idx+k]=Math.max(0,Math.min(255,step<=1?Math.round(value):Math.round(value/step)*step));
+      }
     }
     this.ctx.putImageData(image,0,0);
   }
@@ -199,9 +220,11 @@ class PatinaScene {
 window.PatinaScene=PatinaScene;
 
 class TownAudio {
-  constructor(){this.ctx=null;this.enabled=false;this.timer=null;}
+  constructor(){this.ctx=null;this.enabled=false;this.timer=null;this.volume=0.7;}
+  setVolume(v){this.volume=Math.max(0,Math.min(1,Number(v)||0));}
+  ensure(){if(!this.enabled)return this.toggle();this.ctx?.resume();return this.enabled;}
   toggle(){this.enabled=!this.enabled;if(this.enabled){this.ctx??=new (window.AudioContext||window.webkitAudioContext)();this.ctx.resume();this.music();}else clearInterval(this.timer);return this.enabled;}
-  tone(freq,at,duration=.13,volume=.028,type="triangle"){if(!this.enabled||!this.ctx)return;const osc=this.ctx.createOscillator(),gain=this.ctx.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,at);osc.frequency.exponentialRampToValueAtTime(freq*.8,at+duration);gain.gain.setValueAtTime(.001,at);gain.gain.linearRampToValueAtTime(volume,at+.015);gain.gain.exponentialRampToValueAtTime(.001,at+duration);osc.connect(gain);gain.connect(this.ctx.destination);osc.start(at);osc.stop(at+duration);}
+  tone(freq,at,duration=.13,volume=.028,type="triangle"){const level=volume*(this.volume??1);if(!this.enabled||!this.ctx||level<=0.0005)return;const osc=this.ctx.createOscillator(),gain=this.ctx.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,at);osc.frequency.exponentialRampToValueAtTime(freq*.8,at+duration);gain.gain.setValueAtTime(.001,at);gain.gain.linearRampToValueAtTime(level,at+.015);gain.gain.exponentialRampToValueAtTime(.001,at+duration);osc.connect(gain);gain.connect(this.ctx.destination);osc.start(at);osc.stop(at+duration);}
   speak(name,text,emotion="平静",night=false){if(!this.enabled)return;const params={"诺拉":[470,.12],"芬恩":[150,.17],"萝丝":[330,.075],"汉克":[130,.09],"艾达":[270,.15],"格温":[250,.12],"三个孩子":[540,.07],"旁白":[210,.12]};
     const [base,speed]=params[name]||[250,.12];const count=Math.min(24,Math.ceil(text.length/2));for(let i=0;i<count;i++)this.tone(base*(1+(i%5)*.07)*(emotion==="开心"?1.2:1),this.ctx.currentTime+i*speed,.065+(i%3)*.02,night?.008:.022,i%3?"triangle":"sawtooth");}
   music(){clearInterval(this.timer);const notes=[196,246.94,293.66,261.63,220,196,164.81,220];let step=0;this.timer=setInterval(()=>{if(!this.enabled)return;this.tone(notes[step++%notes.length],this.ctx.currentTime,.65,.012);},700);}
