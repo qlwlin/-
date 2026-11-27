@@ -2,7 +2,9 @@
 const $=id=>document.getElementById(id);
 const PICKUP_IDS=new Set(["glasses","socks","thread","cotton","buttons","paint","cardboard","lightbox","flowerpots","scraps","well","coin_drawer","coin_counter","dropped"]);
 const PICKUP_ITEM={glasses:"glasses",socks:"socks",thread:"thread",cotton:"cotton",buttons:"buttons",paint:"paint",flowerpots:"flower",scraps:"flags",well:"coin",coin_drawer:"coin",coin_counter:"coin"};
-const CODES=["KeyW","KeyA","KeyS","KeyD","KeyE","KeyF","KeyT","KeyM","KeyC","KeyV","KeyH","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","F1","F2","F3","F4","F5","F6","Escape"];
+const DEFAULT_BINDS={up:"KeyW",down:"KeyS",left:"KeyA",right:"KeyD",sprint:"ShiftLeft",crouch:"KeyZ",pickup:"KeyE",talk:"KeyF",travel:"KeyT",tasks:"KeyV",map:"KeyM",settings:"KeyC",hide:"KeyH",slot1:"F1",slot2:"F2",slot3:"F3",slot4:"F4",slot5:"F5",slot6:"F6"};
+const BIND_ORDER=Object.keys(DEFAULT_BINDS);
+const BIND_CODE=/^(Key[A-Z]|Digit[0-9]|F([1-9]|1[0-2])|Shift(Left|Right)|Space)$/;
 class Api {
   async request(path,data){
     let r;try{r=await fetch("/api/"+path,data===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});}
@@ -14,7 +16,7 @@ const glyphs={glasses:"▰",socks:"♧",thread:"◎",cotton:"☁",buttons:"⠿",
 const bigNames={cardboard:"纸箱",cloth:"布卷",lights:"旧灯串"};
 class AppleTown {
   constructor(){
-    this.api=new Api();this.prefs=this.loadPrefs();this.state=null;this.busy=false;this.registering=false;this.keys=new Set();this.hand=null;
+    this.api=new Api();this.prefs=this.loadPrefs();this.state=null;this.busy=false;this.registering=false;this.keys=new Set();this.hand=null;this.listening=null;this.crouching=false;this.settingsTab="sound";
     this.scene=new PatinaScene($("game-scene"));this.scene.onSelect=o=>this.onWorld(o);
     this.oldMessage="";this.lastMove=0;this.lastTick=0;this.journalDirty=false;
     this.applyPrefs();this.bind();this.boot();this.frame=this.frame.bind(this);requestAnimationFrame(this.frame);
@@ -23,14 +25,17 @@ class AppleTown {
   tr(text){return window.townI18n?window.townI18n.phrase(this.prefs.lang,text):text;}
   loadPrefs(){
     let saved={};try{saved=JSON.parse(localStorage.getItem("apple-town-settings")||"{}")||{};}catch{saved={};}
-    return {lang:saved.lang==="en"?"en":"zh",clarity:["low","mid","high"].includes(saved.clarity)?saved.clarity:"low",volume:Number.isFinite(saved.volume)?Math.min(1,Math.max(0,saved.volume)):0.7};
+    const binds={};
+    if(saved.binds&&typeof saved.binds==="object")for(const id of BIND_ORDER)if(BIND_CODE.test(saved.binds[id]))binds[id]=saved.binds[id].startsWith("Shift")?"ShiftLeft":saved.binds[id];
+    const hud=saved.hud||{};
+    return {lang:saved.lang==="en"?"en":"zh",clarity:["low","mid","high"].includes(saved.clarity)?saved.clarity:"low",volume:Number.isFinite(saved.volume)?Math.min(1,Math.max(0,saved.volume)):0.7,music:["auto","day","hearth","night","show","quiet"].includes(saved.music)?saved.music:"auto",binds,hud:{hint:hud.hint===false?false:true,hotbar:["center","left","right"].includes(hud.hotbar)?hud.hotbar:"center",dialogue:hud.dialogue==="top"?"top":"bottom"}};
   }
   savePrefs(){localStorage.setItem("apple-town-settings",JSON.stringify(this.prefs));}
   applyPrefs(){
     document.documentElement.lang=this.prefs.lang==="en"?"en":"zh-CN";
     this.scene.setClarity(this.prefs.clarity);
     if(window.loginScene)window.loginScene.setClarity(this.prefs.clarity);
-    townAudio.setVolume(this.prefs.volume);
+    townAudio.setVolume(this.prefs.volume);townAudio.setTrack(this.prefs.music);this.applyHud();
     this.applyI18n();
     if(this.state&&!$("game-screen").hidden)this.render();
     if(this.state&&!$("mode-screen").hidden)this.showModes();
@@ -62,6 +67,15 @@ class AppleTown {
     $("volume-label").textContent=shown+"%";
     this.syncSoundButtons();
   }
+  bindings(){return {...DEFAULT_BINDS,...this.prefs.binds};}
+  keyLabel(code){if(!code)return "";if(code.startsWith("Key"))return code.slice(3);if(code.startsWith("Digit"))return code.slice(5);if(code.startsWith("Shift"))return "Shift";if(code==="Space")return "Space";return {ArrowUp:"↑",ArrowDown:"↓",ArrowLeft:"←",ArrowRight:"→"}[code]||code;}
+  fill(key,map){return Object.entries(map).reduce((text,[name,value])=>text.replaceAll("{"+name+"}",value),this.t(key));}
+  setMusic(id){if(!["auto","day","hearth","night","show","quiet"].includes(id))return;this.prefs.music=id;this.savePrefs();townAudio.setTrack(id);townAudio.ensure();this.syncSoundButtons();if(!$("settings-panel").hidden)this.renderSettings();}
+  setHud(name,value){const hud={...this.prefs.hud};if(name==="hint")hud.hint=value!=="hide";else if(name==="hotbar"&&["center","left","right"].includes(value))hud.hotbar=value;else if(name==="dialogue"&&["bottom","top"].includes(value))hud.dialogue=value;else return;this.prefs.hud=hud;this.savePrefs();this.applyHud();if(!$("settings-panel").hidden)this.renderSettings();}
+  applyHud(){const hud=this.prefs.hud;$("hint").hidden=!hud.hint;$("hotbar").classList.remove("hud-left","hud-right");if(hud.hotbar==="left")$("hotbar").classList.add("hud-left");if(hud.hotbar==="right")$("hotbar").classList.add("hud-right");$("dialogue").classList.toggle("hud-top",hud.dialogue==="top");}
+  sprinting(){const sprint=this.bindings().sprint;if(String(sprint).startsWith("Shift"))return this.keys.has("ShiftLeft")||this.keys.has("ShiftRight");return this.keys.has(sprint);}
+  isHeld(code){const b=this.bindings();return [b.up,b.down,b.left,b.right,b.sprint,"ArrowUp","ArrowDown","ArrowLeft","ArrowRight","ShiftLeft","ShiftRight"].includes(code);}
+  actionOf(code){const b=this.bindings();if((code==="ShiftLeft"||code==="ShiftRight")&&String(b.sprint).startsWith("Shift"))return "sprint";return BIND_ORDER.find(id=>b[id]===code)||"";}
   syncSoundButtons(){
     $("sound-toggle").textContent=this.t(townAudio.enabled?"ui.sound-login-on":"ui.sound-login");
     $("game-sound").textContent=this.t(townAudio.enabled?"ui.sound-on":"ui.sound-off");
@@ -74,11 +88,14 @@ class AppleTown {
   }
   async boot(){try{const s=await this.api.request("session");if(s.authenticated===false)this.screen("entry");else{this.state=s;s.settings.mode==="pending"?this.showModes():this.showGame();}}catch(e){$("auth-error").textContent=this.tr(e.message);}}
   codeOf(e){
-    if(CODES.includes(e.code))return e.code;
+    if(e.code&&/^(Key[A-Z]|Digit[0-9]|F([1-9]|1[0-2])|Shift(Left|Right)|Space|Arrow(Up|Down|Left|Right)|Escape)$/.test(e.code))return e.code;
     const key=(e.key||"").toLowerCase();
-    const map={w:"KeyW",a:"KeyA",s:"KeyS",d:"KeyD",e:"KeyE",f:"KeyF",t:"KeyT",m:"KeyM",c:"KeyC",v:"KeyV",h:"KeyH",escape:"Escape",arrowup:"ArrowUp",arrowdown:"ArrowDown",arrowleft:"ArrowLeft",arrowright:"ArrowRight"};
-    if(/^f[1-6]$/.test(key))return key.toUpperCase();
-    return map[key]||"";
+    const map={escape:"Escape",arrowup:"ArrowUp",arrowdown:"ArrowDown",arrowleft:"ArrowLeft",arrowright:"ArrowRight"," ":"Space"};
+    if(map[key])return map[key];
+    if(/^[a-z]$/.test(key))return "Key"+key.toUpperCase();
+    if(/^[0-9]$/.test(key))return "Digit"+key;
+    if(/^f([1-9]|1[0-2])$/.test(key))return key.toUpperCase();
+    return "";
   }
   bind(){
     $("login-tab").onclick=()=>this.authTab(false);$("register-tab").onclick=()=>this.authTab(true);
@@ -101,6 +118,13 @@ class AppleTown {
     $("volume").onchange=()=>this.setVolume($("volume").value,true);
     $("vol-down").onclick=()=>this.setVolume(this.prefs.volume-.1,true);
     $("vol-up").onclick=()=>this.setVolume(this.prefs.volume+.1,true);
+    $("settings-panel").addEventListener("click",e=>{
+      const tab=e.target.closest("[data-tab]");if(tab){this.settingsTab=tab.dataset.tab;this.listening=null;this.renderSettings();return;}
+      const music=e.target.closest("[data-music]");if(music){this.setMusic(music.dataset.music);return;}
+      const bind=e.target.closest("[data-bind]");if(bind){this.listening=bind.dataset.bind;this.renderSettings();return;}
+      const hud=e.target.closest("[data-hud]");if(hud)this.setHud(hud.dataset.hud,hud.dataset.value);
+    });
+    $("bind-reset").onclick=()=>{this.prefs.binds={};this.prefs.hud={hint:true,hotbar:"center",dialogue:"bottom"};this.listening=null;this.savePrefs();this.applyHud();this.renderSettings();if(this.state)this.render();};
     $("save-journal").onclick=()=>this.run("game-error",()=>this.action("journal",{text:$("journal").value}));
     $("journal").oninput=()=>{this.journalDirty=true;clearTimeout(this.journalTimer);this.journalTimer=setTimeout(()=>this.flushJournal(),1200);};
     $("drop-item").onclick=()=>this.dropHeld();
@@ -111,16 +135,31 @@ class AppleTown {
     $("restart").onclick=()=>this.perform("restart");
     for(const id of ["sound-toggle","game-sound"])$(id).onclick=()=>{if(townAudio.volume<=0){this.setVolume(.7,true);return;}townAudio.toggle();this.syncSoundButtons();};
     document.addEventListener("keydown",e=>this.onKey(e));
-    document.addEventListener("keyup",e=>{this.keys.delete(this.codeOf(e));if(this.codeOf(e)==="KeyE")this.cancelHold();});
+    document.addEventListener("keyup",e=>{const code=this.codeOf(e);this.keys.delete(code);if(code&&this.actionOf(code)==="pickup")this.cancelHold();});
     document.addEventListener("pointerup",()=>this.cancelHold());
     window.addEventListener("blur",()=>{this.keys.clear();this.cancelHold();});
     window.addEventListener("beforeunload",e=>{if(this.journalDirty||this.busy){e.preventDefault();e.returnValue="";}});
   }
   onKey(e){
+    if(this.listening){
+      const code=this.codeOf(e);if(!code)return;
+      e.preventDefault();
+      if(code==="Escape"){this.listening=null;this.renderSettings();return;}
+      if(!BIND_CODE.test(code)||e.repeat)return;
+      const next=code.startsWith("Shift")?"ShiftLeft":code;
+      const binds=this.bindings();
+      for(const id of BIND_ORDER)if(binds[id]===next&&id!==this.listening)binds[id]=binds[this.listening];
+      binds[this.listening]=next;
+      this.prefs.binds={};
+      for(const id of BIND_ORDER)if(binds[id]!==DEFAULT_BINDS[id])this.prefs.binds[id]=binds[id];
+      this.listening=null;this.savePrefs();this.renderSettings();if(this.state)this.render();
+      return;
+    }
     if($("game-screen").hidden||document.querySelector("dialog[open]"))return;
     const code=this.codeOf(e);if(!code)return;
     const field=["INPUT","TEXTAREA"].includes(e.target.tagName);
     if(field&&e.target.id!=="volume"){if(code==="Escape"){e.target.blur();e.preventDefault();}return;}
+    if(code==="Space")e.preventDefault();
     const panel=!$("settings-panel").hidden||!$("map-panel").hidden;
     if(code==="Escape"&&!e.repeat){
       if(!$("settings-panel").hidden)this.toggleSettings(false);
@@ -129,23 +168,28 @@ class AppleTown {
       e.preventDefault();return;
     }
     if(panel){
-      if(code==="KeyC"&&!e.repeat)this.toggleSettings();
-      else if(code==="KeyM"&&!e.repeat)this.toggleMap();
-      else if(code==="KeyV"&&!e.repeat)this.toggleTasks();
+      if(!e.repeat){
+        const act=this.actionOf(code);
+        if(act==="settings")this.toggleSettings();
+        else if(act==="map")this.toggleMap();
+        else if(act==="tasks")this.toggleTasks();
+      }
       if(e.target.id==="volume"&&code.startsWith("Arrow"))return;
-      if(["KeyW","KeyA","KeyS","KeyD","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(code))e.preventDefault();
+      if(this.isHeld(code))e.preventDefault();
       return;
     }
-    if(["KeyW","KeyA","KeyS","KeyD","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(code)){e.preventDefault();this.keys.add(code);return;}
+    if(this.isHeld(code)){e.preventDefault();this.keys.add(code);return;}
     if(e.repeat)return;
-    if(code==="KeyE"){e.preventDefault();this.onPickupKey();}
-    else if(code==="KeyF"){e.preventDefault();this.onTalk();}
-    else if(code==="KeyT"){e.preventDefault();this.onTravel();}
-    else if(code==="KeyM"){e.preventDefault();this.toggleMap();}
-    else if(code==="KeyC"){e.preventDefault();this.toggleSettings();}
-    else if(code==="KeyV"){e.preventDefault();this.toggleTasks();}
-    else if(code==="KeyH"){e.preventDefault();this.onHide();}
-    else if(/^F[1-6]$/.test(code)){e.preventDefault();this.takeOut(Number(code.slice(1))-1);}
+    const act=this.actionOf(code);
+    if(act==="crouch"){e.preventDefault();this.crouching=!this.crouching;this.scene.crouch=this.crouching;}
+    else if(act==="pickup"){e.preventDefault();this.onPickupKey();}
+    else if(act==="talk"){e.preventDefault();this.onTalk();}
+    else if(act==="travel"){e.preventDefault();this.onTravel();}
+    else if(act==="map"){e.preventDefault();this.toggleMap();}
+    else if(act==="settings"){e.preventDefault();this.toggleSettings();}
+    else if(act==="tasks"){e.preventDefault();this.toggleTasks();}
+    else if(act==="hide"){e.preventDefault();this.onHide();}
+    else if(/^slot[1-6]$/.test(act)){e.preventDefault();this.takeOut(Number(act.slice(4))-1);}
   }
   async flushJournal(){if(!this.journalDirty||!this.state)return;if(this.busy){this.journalTimer=setTimeout(()=>this.flushJournal(),500);return;}await this.perform("journal",{text:$("journal").value});}
   authTab(registering,keepError){
@@ -182,15 +226,30 @@ class AppleTown {
   pickupItemId(o){if(o.kind==="pickup"&&o.item)return o.item;return PICKUP_ITEM[o.id]||null;}
   toggleTasks(force){const next=typeof force==="boolean"?force:$("task-panel").hidden;$("task-panel").hidden=!next;}
   toggleMap(force){const next=typeof force==="boolean"?force:$("map-panel").hidden;$("map-panel").hidden=!next;if(next){$("settings-panel").hidden=true;this.renderMap();}this.keys.clear();}
-  toggleSettings(force){const next=typeof force==="boolean"?force:$("settings-panel").hidden;$("settings-panel").hidden=!next;if(next){$("map-panel").hidden=true;this.renderSettings();}this.keys.clear();}
+  toggleSettings(force){const next=typeof force==="boolean"?force:$("settings-panel").hidden;$("settings-panel").hidden=!next;if(!next)this.listening=null;if(next){$("map-panel").hidden=true;this.renderSettings();}this.keys.clear();}
   renderSettings(){
+    const tab=this.settingsTab||"sound";
+    document.querySelectorAll("#setting-tabs button").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+    $("pane-sound").hidden=tab!=="sound";$("pane-picture").hidden=tab!=="picture";$("pane-controls").hidden=tab!=="controls";
     document.querySelectorAll("#lang-options button").forEach(b=>b.classList.toggle("active",b.dataset.lang===this.prefs.lang));
     document.querySelectorAll("#clarity-options button").forEach(b=>b.classList.toggle("active",b.dataset.clarity===this.prefs.clarity));
+    document.querySelectorAll("#music-options button").forEach(b=>b.classList.toggle("active",b.dataset.music===this.prefs.music));
     const shown=String(Math.round(this.prefs.volume*100));
     $("volume").value=shown;$("volume-label").textContent=shown+"%";
     $("clarity-note").textContent=this.t("set.note-"+this.prefs.clarity);
-    const list=$("control-list");list.replaceChildren();
-    for(const key of ["ctrl.wasd","ctrl.e","ctrl.f","ctrl.t","ctrl.v","ctrl.m","ctrl.c","ctrl.fn","ctrl.h","ctrl.mouse"]){const li=document.createElement("li");li.textContent=this.t(key);list.append(li);}
+    const binds=this.bindings(),list=$("bind-list");list.replaceChildren();
+    for(const id of BIND_ORDER){
+      const row=document.createElement("div");row.className="bind-row";
+      const name=document.createElement("span");name.textContent=id.startsWith("slot")?this.t("bind.slot").replace("{n}",id.slice(4)):this.t("bind."+id);
+      const button=document.createElement("button");button.type="button";button.dataset.bind=id;
+      button.textContent=this.listening===id?this.t("set.bind.wait"):this.keyLabel(binds[id]);
+      if(this.listening===id)button.classList.add("listening");
+      row.append(name,button);list.append(row);
+    }
+    const hud=this.prefs.hud;
+    document.querySelectorAll("#hud-hint button").forEach(b=>b.classList.toggle("active",(b.dataset.value==="show")===!!hud.hint));
+    document.querySelectorAll("#hud-hotbar button").forEach(b=>b.classList.toggle("active",b.dataset.value===hud.hotbar));
+    document.querySelectorAll("#hud-dialogue button").forEach(b=>b.classList.toggle("active",b.dataset.value===hud.dialogue));
   }
   renderMap(){
     const p=this.state?.progress;if(!p)return;
@@ -207,12 +266,14 @@ class AppleTown {
       board.append(line);
     }
     $("map-here").textContent=this.t("map.you").replace("{place}",this.t("scene."+p.scene));
+    $("map-note").textContent=this.t("map.note").replace("{key}",this.keyLabel(this.bindings().travel));
   }
   labelFor(o){
     const name=this.tr(o.label)+(o.amount>1?" ×"+o.amount:"");
-    if(o.dest||o.kind==="door")return "T · "+name;
-    if(o.kind==="npc"||o.kind==="kids")return "F · "+name;
-    if(this.isPickup(o))return "E · "+name;
+    const keys=this.bindings();
+    if(o.dest||o.kind==="door")return this.keyLabel(keys.travel)+" · "+name;
+    if(o.kind==="npc"||o.kind==="kids")return this.keyLabel(keys.talk)+" · "+name;
+    if(this.isPickup(o))return this.keyLabel(keys.pickup)+" · "+name;
     if(o.id==="sew")return this.t("act.sew")+" · "+this.tr(this.state.world.sew_instruction);
     return name;
   }
@@ -232,7 +293,7 @@ class AppleTown {
     $("game-error").textContent=this.t("err.nothing");
   }
   onTalk(){const person=this.near().find(o=>o.kind==="npc"||o.kind==="kids");if(!person){$("game-error").textContent=this.t("err.no-person");return;}this.talkTo(person);}
-  onTravel(){const door=this.near().find(o=>o.dest||o.kind==="door");if(!door){$("game-error").textContent=this.t("err.no-door");return;}this.travelTo(door);}
+  onTravel(){const door=this.near().find(o=>o.dest||o.kind==="door");if(!door){$("game-error").textContent=this.t("err.no-door").replace("{key}",this.keyLabel(this.bindings().travel));return;}this.travelTo(door);}
   onHide(){const p=this.state.progress;if(p.hiding){this.perform("unhide");return;}const hide=this.near().find(o=>o.kind==="hide");if(hide)this.interact(hide);}
   travelTo(o){this.interact(o);}
   talkTo(o){const pending=this.interact(o);if(o.id==="nora"&&pending&&pending.then)pending.then(()=>{if(!$("chat-box").hidden)$("chat-input").focus();});}
@@ -274,7 +335,7 @@ class AppleTown {
   async startHold(){
     if(this.holding||this.busy||this.state.progress.card_placed)return;
     this.holding=true;
-    for(const code of ["KeyW","KeyA","KeyS","KeyD","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"])this.keys.delete(code);
+    const held=this.bindings();for(const code of [held.up,held.down,held.left,held.right,held.sprint,"ArrowUp","ArrowDown","ArrowLeft","ArrowRight","ShiftLeft","ShiftRight"])this.keys.delete(code);
     const ok=await this.perform("hold_card",{start:true});if(!ok){this.holding=false;return;}
     if(!this.holding)return;
     this.holdTimer=setTimeout(async()=>{if(this.holding){await this.perform("hold_card");this.holding=false;}},2100);
@@ -295,13 +356,17 @@ class AppleTown {
     const count=document.createElement("p");count.textContent=this.t("task.count").replace("{a}",p.puppet_count).replace("{b}",p.light_repairs).replace("{c}",Math.min(p.bake_step,4));$("task-list").append(count);
     $("clue-list").replaceChildren();for(const clue of p.clues){const div=document.createElement("div");div.className="clue";div.textContent="— "+this.tr(clue);$("clue-list").append(div);}
     $("nora-location").textContent=w.nora_scene?this.t("nora.at").replace("{place}",this.t("scene."+w.nora_scene)):this.t("nora.asleep");
-    if(p.carrying){$("carry-status").hidden=false;$("carry-label").textContent=this.t("carry.big")+" "+this.tr(bigNames[p.carrying]||p.carrying)+this.t("carry.drop");}
-    else if(this.hand==="glasses"&&!p.glasses){const index=Object.keys(p.inventory).indexOf("glasses");$("carry-status").hidden=false;$("carry-label").textContent=this.t("carry.glasses").replace("{key}",index>=0?"F"+(index+1):"F");}
-    else if(this.hand){$("carry-status").hidden=false;$("carry-label").textContent=this.t("carry.hand")+" "+this.tr(w.items[this.hand])+this.t("carry.drop");}
+    const dropKey=this.keyLabel(this.bindings().pickup);
+    if(p.carrying){$("carry-status").hidden=false;$("carry-label").textContent=this.t("carry.big")+" "+this.tr(bigNames[p.carrying]||p.carrying)+this.t("carry.drop").replace("{drop}",dropKey);}
+    else if(this.hand==="glasses"&&!p.glasses){const index=Object.keys(p.inventory).indexOf("glasses");const slot=this.keyLabel(this.bindings()["slot"+(index+1)]);$("carry-status").hidden=false;$("carry-label").textContent=this.t("carry.glasses").replace("{key}",slot).replace("{drop}",dropKey);}
+    else if(this.hand){$("carry-status").hidden=false;$("carry-label").textContent=this.t("carry.hand")+" "+this.tr(w.items[this.hand])+this.t("carry.drop").replace("{drop}",dropKey);}
     else $("carry-status").hidden=true;
+    $("open-map").textContent=this.t("ui.map-name")+" "+this.keyLabel(this.bindings().map);
+    $("open-tasks").textContent=this.t("ui.tasks-name")+" "+this.keyLabel(this.bindings().tasks);
+    $("open-settings").textContent=this.t("ui.settings-name")+" "+this.keyLabel(this.bindings().settings);
     $("hotbar").replaceChildren();const items=Object.entries(p.inventory);
     for(let i=0;i<6;i++){
-      const b=document.createElement("button"),pair=items[i],keyName="F"+(i+1);b.type="button";
+      const b=document.createElement("button"),pair=items[i],keyName=this.keyLabel(this.bindings()["slot"+(i+1)]);b.type="button";
       if(pair){const [id,amount]=pair;if(id==="glasses"&&p.glasses)b.classList.add("worn");if(this.hand===id)b.classList.add("held");
         const g=document.createElement("span");g.className="glyph";g.textContent=glyphs[id]||"◇";
         const label=document.createElement("span");label.textContent=this.tr(w.items[id]);
@@ -327,7 +392,11 @@ class AppleTown {
     const cinema=!!p.cutscene_at&&!p.ending;$("cinema").hidden=!cinema;
     if(this.lastPhase!==p.phase||this.lastCinema!==cinema){townAudio.mode(p.phase,cinema);this.lastPhase=p.phase;this.lastCinema=cinema;}
     if(cinema)this.renderCinema();
-    $("hint").textContent=w.blocked?this.t("hint.blocked"):this.t("hint.play");
+    const keys=this.bindings();
+    const move=this.keyLabel(keys.up)+this.keyLabel(keys.left)+this.keyLabel(keys.down)+this.keyLabel(keys.right);
+    const glassesIndex=Object.keys(p.inventory).indexOf("glasses");
+    $("hint").textContent=w.blocked?this.t("hint.blocked").replace("{key}",this.keyLabel(keys["slot"+(glassesIndex+1)]))
+      :this.fill("hint.play",{move,sprint:this.keyLabel(keys.sprint),crouch:this.keyLabel(keys.crouch),pickup:this.keyLabel(keys.pickup),talk:this.keyLabel(keys.talk),travel:this.keyLabel(keys.travel),tasks:this.keyLabel(keys.tasks),map:this.keyLabel(keys.map),settings:this.keyLabel(keys.settings),slots:this.keyLabel(keys.slot1)+"–"+this.keyLabel(keys.slot6),hide:this.keyLabel(keys.hide)});
     if(!$("map-panel").hidden)this.renderMap();
   }
   renderCinema(){const seconds=Math.max(0,Date.now()/1000-this.state.progress.cutscene_at);
@@ -343,12 +412,14 @@ class AppleTown {
     if(p.cutscene_at&&!p.ending){this.renderCinema();if(now-this.lastTick>1000&&!this.busy){this.lastTick=now;this.perform("tick");}return;}
     const typing=["INPUT","TEXTAREA"].includes(document.activeElement?.tagName);
     const paused=!$("settings-panel").hidden||!$("map-panel").hidden;
-    let dx=0,dy=0;
-    if(!typing&&!paused){if(this.keys.has("KeyW")||this.keys.has("ArrowUp")){dx--;dy--;}if(this.keys.has("KeyS")||this.keys.has("ArrowDown")){dx++;dy++;}
-      if(this.keys.has("KeyA")||this.keys.has("ArrowLeft")){dx--;dy++;}if(this.keys.has("KeyD")||this.keys.has("ArrowRight")){dx++;dy--;}}
-    this.scene.walking=!!(dx||dy)&&!this.busy;
+    let dx=0,dy=0;const keys=this.bindings();
+    if(!typing&&!paused){if(this.keys.has(keys.up)||this.keys.has("ArrowUp")){dx--;dy--;}if(this.keys.has(keys.down)||this.keys.has("ArrowDown")){dx++;dy++;}
+      if(this.keys.has(keys.left)||this.keys.has("ArrowLeft")){dx--;dy++;}if(this.keys.has(keys.right)||this.keys.has("ArrowRight")){dx++;dy--;}}
+    const sprint=this.sprinting()&&!this.crouching;
+    const pace=this.crouching?0.75:sprint?1.25:1;
+    this.scene.crouch=this.crouching;this.scene.sprinting=sprint;this.scene.walking=!!(dx||dy)&&!this.busy;
     if((dx||dy)&&!this.busy&&!p.hiding&&!this.holding&&now-this.lastMove>130){
-      this.lastMove=now;const amount=(p.carrying?.17:.29)/Math.hypot(dx,dy);
+      this.lastMove=now;const amount=(p.carrying?0.17:0.29)*pace/Math.hypot(dx,dy);
       const pos=[Math.max(.65,Math.min(9.35,p.position[0]+dx*amount)),Math.max(.65,Math.min(9.35,p.position[1]+dy*amount))];
       if(p.scene.startsWith("night_")&&this.state.world.obstacles.some(([x1,y1,x2,y2])=>pos[0]>=x1&&pos[0]<=x2&&pos[1]>=y1&&pos[1]<=y2))return;
       this.perform("move",{position:pos});

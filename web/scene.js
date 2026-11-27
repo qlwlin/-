@@ -71,11 +71,21 @@ class PatinaScene {
       this.poly([[xx,base-19*size],[xx+w,base],[xx,base+6*size]],"#34483c",true);
       if(snow)this.poly([[xx-w*.65,base-6*size],[xx,base-19*size],[xx+w*.65,base-6*size]],"#c0c5b4",true);}
   }
-  person(x,y,name="player",glasses=false,hiding=false,color=null){
+  pace(id,x,y){
+    const seed=[...String(id)].reduce((n,ch)=>n+ch.charCodeAt(0),7);
+    const t=this.frame*.045+seed;
+    const wave=Math.sin(t);
+    const span=.42,ang=(seed%7)*.55;
+    return {x:x+Math.cos(ang)*wave*span,y:y+Math.sin(ang)*wave*span*.7,moving:Math.abs(Math.cos(t))>.18};
+  }
+  person(x,y,name="player",glasses=false,hiding=false,color=null,moving=false){
     const [xx,yy]=this.project(x,y),c=this.c;
     this.shadow(x,y,.6,.45);c.save();c.globalAlpha=hiding?.4:1;
+    if(name==="player"&&this.crouch){c.translate(0,yy);c.scale(1,.72);c.translate(0,-yy);}
     const body=color||(name==="player"?"#9b493c":name==="nora"?"#788585":"#817855");
-    const bounce=name==="player"&&this.walking?Math.sin(this.frame*.6)*1.5:Math.sin(this.frame*.1)*.3;
+    const walk=name==="player"?this.walking:moving;
+    const tempo=name==="player"&&this.sprinting?0.95:0.6;
+    const bounce=walk?Math.sin(this.frame*tempo)*1.5:Math.sin(this.frame*.1)*.3;
     this.poly([[xx-5,yy-12+bounce],[xx+5,yy-12+bounce],[xx+7,yy-3],[xx-6,yy-2]],body,true);
     this.poly([[xx+2,yy-12],[xx+5,yy-12],[xx+7,yy-3],[xx+2,yy-2]],"#4f3e37",true);
     this.poly([[xx-5,yy-24+bounce],[xx+3,yy-26+bounce],[xx+7,yy-21+bounce],[xx+6,yy-14+bounce],[xx-4,yy-13+bounce],[xx-7,yy-18+bounce]],"#c7aa85",true);
@@ -89,10 +99,15 @@ class PatinaScene {
     c.restore();
   }
   prop(o,p){
-    const {x,y,kind,id}=o,c=this.c,[xx,yy]=this.project(x,y);
+    let {x,y,kind,id}=o,c=this.c,moving=false;
+    if(!this.login&&(kind==="npc"||kind==="kids")){const paced=this.pace(id,x,y);x=paced.x;y=paced.y;moving=paced.moving;}
+    const [xx,yy]=this.project(x,y);
     this.shadow(x,y,.65,.45);
-    if(kind==="npc"){this.person(x,y,id);return;}
-    if(kind==="kids"){[-.5,0,.5].forEach((v,i)=>this.person(x+v,y-v*.7,"kid",false,false,["#82764f","#765750","#537171"][i]));return;}
+    if(kind==="npc"||kind==="kids"){
+      if(kind==="npc")this.person(x,y,id,false,false,null,moving);
+      else [-.5,0,.5].forEach((v,i)=>this.person(x+v,y-v*.7,"kid",false,false,["#82764f","#765750","#537171"][i],moving));
+      this.hits.push({obj:o,x:xx,y:yy-10,r:22});return;
+    }
     if(kind==="tree"){this.tree(x,y,1.4);return;}
     if(kind==="door"){
       if(o.ladder){for(let i=0;i<7;i++){c.fillStyle="#aa9270";c.fillRect(xx-5,yy-22+i*3,11,1);}c.fillStyle="#716249";c.fillRect(xx-6,yy-24,2,25);c.fillRect(xx+5,yy-24,2,25);}
@@ -220,15 +235,33 @@ class PatinaScene {
 window.PatinaScene=PatinaScene;
 
 class TownAudio {
-  constructor(){this.ctx=null;this.enabled=false;this.timer=null;this.volume=0.7;}
+  constructor(){this.ctx=null;this.enabled=false;this.timer=null;this.volume=0.7;this.track="auto";this.phase="morning";this.cinema=false;this.playing="";}
   setVolume(v){this.volume=Math.max(0,Math.min(1,Number(v)||0));}
+  setTrack(id){this.track=id||"auto";this.playing="";if(this.enabled)this.refresh();}
   ensure(){if(!this.enabled)return this.toggle();this.ctx?.resume();return this.enabled;}
-  toggle(){this.enabled=!this.enabled;if(this.enabled){this.ctx??=new (window.AudioContext||window.webkitAudioContext)();this.ctx.resume();this.music();}else clearInterval(this.timer);return this.enabled;}
+  toggle(){this.enabled=!this.enabled;if(this.enabled){this.ctx??=new (window.AudioContext||window.webkitAudioContext)();this.ctx.resume();this.playing="";this.refresh();}else{clearInterval(this.timer);this.playing="";}return this.enabled;}
   tone(freq,at,duration=.13,volume=.028,type="triangle"){const level=volume*(this.volume??1);if(!this.enabled||!this.ctx||level<=0.0005)return;const osc=this.ctx.createOscillator(),gain=this.ctx.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,at);osc.frequency.exponentialRampToValueAtTime(freq*.8,at+duration);gain.gain.setValueAtTime(.001,at);gain.gain.linearRampToValueAtTime(level,at+.015);gain.gain.exponentialRampToValueAtTime(.001,at+duration);osc.connect(gain);gain.connect(this.ctx.destination);osc.start(at);osc.stop(at+duration);}
   speak(name,text,emotion="平静",night=false){if(!this.enabled)return;const params={"诺拉":[470,.12],"芬恩":[150,.17],"萝丝":[330,.075],"汉克":[130,.09],"艾达":[270,.15],"格温":[250,.12],"三个孩子":[540,.07],"旁白":[210,.12]};
     const [base,speed]=params[name]||[250,.12];const count=Math.min(24,Math.ceil(text.length/2));for(let i=0;i<count;i++)this.tone(base*(1+(i%5)*.07)*(emotion==="开心"?1.2:1),this.ctx.currentTime+i*speed,.065+(i%3)*.02,night?.008:.022,i%3?"triangle":"sawtooth");}
-  music(){clearInterval(this.timer);const notes=[196,246.94,293.66,261.63,220,196,164.81,220];let step=0;this.timer=setInterval(()=>{if(!this.enabled)return;this.tone(notes[step++%notes.length],this.ctx.currentTime,.65,.012);},700);}
+  play(id){
+    const tracks={
+      day:{notes:[196,246.94,293.66,261.63,220,196,164.81,220],gap:700,dur:.65,vol:.012,type:"triangle"},
+      hearth:{notes:[174.61,196,220,196,174.61,146.83,164.81,196],gap:840,dur:.8,vol:.011,type:"sine"},
+      night:{notes:[146.83,164.81,146.83,130.81],gap:1500,dur:1.5,vol:.008,type:"sine"},
+      show:{notes:[392,440,523.25,659.25,587.33,523.25,440,392],gap:550,dur:.5,vol:.016,type:"triangle"},
+      quiet:{notes:[220,246.94],gap:2800,dur:1.8,vol:.005,type:"sine"}
+    };
+    const track=tracks[id]||tracks.day;
+    clearInterval(this.timer);let step=0;
+    this.timer=setInterval(()=>{if(!this.enabled)return;this.tone(track.notes[step++%track.notes.length],this.ctx.currentTime,track.dur,track.vol,track.type);},track.gap);
+  }
+  refresh(){
+    if(!this.enabled)return;
+    const id=this.track&&this.track!=="auto"?this.track:(this.cinema?"show":this.phase==="night"?"night":"day");
+    if(id===this.playing)return;
+    this.playing=id;this.play(id);
+  }
   carousel(){if(!this.enabled)return;[523,659,784,659,587,698,880,698].forEach((n,i)=>this.tone(n,this.ctx.currentTime+i*.22,.2,.025,"sine"));}
-  mode(phase,cinema=false){if(!this.enabled)return;clearInterval(this.timer);if(phase==="night"){this.timer=setInterval(()=>this.tone(146.8,this.ctx.currentTime,2,.008,"sine"),2600);}else if(cinema){const notes=[392,440,523,659,587,523,440,392];let i=0;this.timer=setInterval(()=>this.tone(notes[i++%8],this.ctx.currentTime,.5,.018),550);}else this.music();}
+  mode(phase,cinema=false){this.phase=phase||"morning";this.cinema=!!cinema;this.refresh();}
 }
 window.townAudio=new TownAudio();

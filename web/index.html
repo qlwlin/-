@@ -39,11 +39,23 @@
       <header class="game-header"><div><span class="eyebrow" data-i18n="ui.game-kicker">APPLE TOWN / THE PUPPET SHOW</span><h1 id="location-name">老橡树 · 树屋</h1><span id="phase-name"></span></div><div class="game-menu"><button id="open-map" type="button" data-i18n="ui.map-btn">地图 M</button><button id="open-tasks" type="button" data-i18n="ui.tasks-btn">任务 V</button><button id="open-settings" type="button" data-i18n="ui.settings-btn">设置 C</button><button id="game-sound" type="button" data-i18n="ui.sound-off">♫ 声音关</button><button id="change-mode" type="button" data-i18n="ui.dialogue-settings">对话设置</button><button id="logout" type="button" data-i18n="ui.logout">退出</button></div></header>
       <aside id="settings-panel" class="overlay-panel settings-panel paper" hidden>
         <div class="panel-head"><h2 data-i18n="set.title">设置</h2><button id="close-settings" type="button" data-i18n-aria="ui.close" aria-label="关闭">×</button></div>
-        <h3 data-i18n="set.lang">语言</h3><div class="setting-row" id="lang-options"><button type="button" data-lang="zh">中文</button><button type="button" data-lang="en">English</button></div>
-        <h3 data-i18n="set.clarity">画面清晰度</h3><div class="setting-row" id="clarity-options"><button type="button" data-clarity="low" data-i18n="set.low">低</button><button type="button" data-clarity="mid" data-i18n="set.mid">中</button><button type="button" data-clarity="high" data-i18n="set.high">高</button></div>
-        <p class="muted" id="clarity-note"></p>
-        <h3 data-i18n="set.volume">音量</h3><div class="setting-row volume-row"><button id="vol-down" type="button" data-i18n-aria="set.vol-down" aria-label="减小音量">－</button><input id="volume" type="range" min="0" max="100" value="70" data-i18n-aria="set.volume-aria" aria-label="音量"><button id="vol-up" type="button" data-i18n-aria="set.vol-up" aria-label="增大音量">＋</button><span id="volume-label">70%</span></div>
-        <h3 data-i18n="set.controls">键位</h3><ul id="control-list" class="control-list"></ul>
+        <div class="setting-tabs" id="setting-tabs"><button type="button" data-tab="sound" data-i18n="set.tab.sound">声音</button><button type="button" data-tab="picture" data-i18n="set.tab.picture">画面</button><button type="button" data-tab="controls" data-i18n="set.tab.controls">操作</button></div>
+        <div id="pane-sound">
+          <h3 data-i18n="set.music">音乐</h3><div class="setting-row" id="music-options"><button type="button" data-music="auto" data-i18n="set.music.auto">跟随时间</button><button type="button" data-music="day" data-i18n="set.music.day">白日</button><button type="button" data-music="hearth" data-i18n="set.music.hearth">炉边</button><button type="button" data-music="night" data-i18n="set.music.night">雪夜</button><button type="button" data-music="show" data-i18n="set.music.show">木偶戏</button><button type="button" data-music="quiet" data-i18n="set.music.quiet">安静</button></div>
+          <h3 data-i18n="set.volume">音量</h3><div class="setting-row volume-row"><button id="vol-down" type="button" data-i18n-aria="set.vol-down" aria-label="减小音量">－</button><input id="volume" type="range" min="0" max="100" value="70" data-i18n-aria="set.volume-aria" aria-label="音量"><button id="vol-up" type="button" data-i18n-aria="set.vol-up" aria-label="增大音量">＋</button><span id="volume-label">70%</span></div>
+        </div>
+        <div id="pane-picture" hidden>
+          <h3 data-i18n="set.lang">语言</h3><div class="setting-row" id="lang-options"><button type="button" data-lang="zh">中文</button><button type="button" data-lang="en">English</button></div>
+          <h3 data-i18n="set.clarity">画面清晰度</h3><div class="setting-row" id="clarity-options"><button type="button" data-clarity="low" data-i18n="set.low">低</button><button type="button" data-clarity="mid" data-i18n="set.mid">中</button><button type="button" data-clarity="high" data-i18n="set.high">高</button></div>
+          <p class="muted" id="clarity-note"></p>
+        </div>
+        <div id="pane-controls" hidden>
+          <h3 data-i18n="set.controls">键位</h3><p class="muted" data-i18n="set.bind.note">点一下按键，再按键盘上的新键。一开始仍是原来的操作。</p><div id="bind-list"></div><button id="bind-reset" type="button" data-i18n="set.bind.reset">恢复最初操作</button>
+          <h3 data-i18n="set.hud">界面</h3>
+          <p class="muted" data-i18n="set.hud.hint">底部提示</p><div class="setting-row" id="hud-hint"><button type="button" data-hud="hint" data-value="show" data-i18n="set.hud.show">显示</button><button type="button" data-hud="hint" data-value="hide" data-i18n="set.hud.hide">隐藏</button></div>
+          <p class="muted" data-i18n="set.hud.hotbar">快捷栏位置</p><div class="setting-row" id="hud-hotbar"><button type="button" data-hud="hotbar" data-value="center" data-i18n="set.hud.center">底部居中</button><button type="button" data-hud="hotbar" data-value="left" data-i18n="set.hud.left">左下</button><button type="button" data-hud="hotbar" data-value="right" data-i18n="set.hud.right">右下</button></div>
+          <p class="muted" data-i18n="set.hud.dialogue">对话框位置</p><div class="setting-row" id="hud-dialogue"><button type="button" data-hud="dialogue" data-value="bottom" data-i18n="set.hud.bottom">底部</button><button type="button" data-hud="dialogue" data-value="top" data-i18n="set.hud.top">靠上</button></div>
+        </div>
         <p class="muted" data-i18n="set.nora">诺拉的自由对话沿用模型的语言。离线时她说预设台词。</p>
       </aside>
       <aside id="map-panel" class="overlay-panel map-panel paper" hidden>
